@@ -8,11 +8,13 @@ como `https://reservas.seudominio.com.br`.
 1. [Qual opção escolher](#1-qual-opção-escolher)
 2. [Opção recomendada: servidor VPS com Docker](#2-opção-recomendada-servidor-vps-com-docker)
 3. [Configurando o domínio (DNS)](#3-configurando-o-domínio-dns)
+   - [3.1. Publicar sem domínio (só com o IP da VPS)](#31-publicar-sem-domínio-só-com-o-ip-da-vps)
 4. [Atualizar o sistema publicado](#4-atualizar-o-sistema-publicado)
 5. [Backup e restauração](#5-backup-e-restauração)
 6. [Alternativa: plataformas gerenciadas](#6-alternativa-plataformas-gerenciadas)
 7. [Checklist de segurança antes de abrir ao público](#7-checklist-de-segurança-antes-de-abrir-ao-público)
 8. [Problemas comuns na hospedagem](#8-problemas-comuns-na-hospedagem)
+   - [8.1. Diagnóstico do Caddy (HTTPS e domínio)](#81-diagnóstico-do-caddy-https-e-domínio)
 9. [E-mail (envio do protocolo)](#9-e-mail-envio-do-protocolo)
 
 ---
@@ -84,7 +86,8 @@ su - deploy
 ### 2.3. Configurar o domínio
 
 Faça agora o passo da **[seção 3](#3-configurando-o-domínio-dns)** (apontar o
-domínio para o IP do servidor). O HTTPS só é emitido depois que o domínio
+domínio para o IP do servidor). **Ainda não tem domínio?** Veja a
+[seção 3.1](#31-publicar-sem-domínio-só-com-o-ip-da-vps). O HTTPS só é emitido depois que o domínio
 aponta corretamente.
 
 ### 2.4. Baixar o projeto e configurar
@@ -174,6 +177,43 @@ Cloudflare…), crie um registro:
 
 O **Caddy** emite e renova sozinho o certificado HTTPS (Let's Encrypt). Não há
 nada a fazer, desde que as portas 80 e 443 estejam liberadas e o DNS correto.
+
+### 3.1. Publicar sem domínio (só com o IP da VPS)
+
+Um endereço como `reservas.203.0.113.10` **não existe**: subdomínios só
+funcionam com nomes de domínio, não com números de IP. Há duas alternativas
+(nos exemplos, troque `203.0.113.10` pelo IP da sua VPS).
+
+**Opção A — sslip.io (grátis, com HTTPS). Recomendada para começar.**
+
+O serviço público **sslip.io** transforma qualquer IP em um nome. Troque os
+pontos do IP por hífens e acrescente `.sslip.io`. Não há cadastro nem DNS a
+configurar.
+
+```env
+DOMINIO="reservas.203-0-113-10.sslip.io"
+APP_URL="https://reservas.203-0-113-10.sslip.io"
+```
+
+Acesse `https://reservas.203-0-113-10.sslip.io`. O Caddy emite o certificado
+normalmente. Pontos fracos: o endereço é longo e depende de um serviço de
+terceiros. Para uso definitivo, prefira um domínio próprio.
+
+**Opção B — só o IP, sem HTTPS. Apenas para um teste rápido.**
+
+```env
+DOMINIO="http://203.0.113.10"
+APP_URL="http://203.0.113.10"
+```
+
+Acesse `http://203.0.113.10`. **Atenção:** sem HTTPS, senhas, nomes e
+telefones trafegam sem criptografia, e o navegador mostra “Não seguro”. Não use
+assim com dados reais.
+
+**Depois, ao registrar um domínio** (`.com.br` no Registro.br custa cerca de
+R$ 40/ano): crie o registro DNS (seção 3), troque `DOMINIO` e `APP_URL` no
+`.env.producao` e rode o comando de subir o sistema (seção 2.5) de novo. Os
+dados não são afetados.
 
 ---
 
@@ -282,6 +322,60 @@ Observações:
 | Login funciona e logo desloga | `APP_URL` com `https://` mas acessando por `http://`. Acesse sempre pelo domínio com HTTPS. |
 | Build falha por falta de memória | Servidor com 1 GB: crie um swap de 2 GB (`fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile`). |
 | Horários exibidos errados | O sistema sempre exibe no fuso `America/Sao_Paulo`, independentemente do fuso do servidor. Se algo divergir, verifique o relógio do servidor (`timedatectl`). |
+| Erro de configuração do Caddy | Veja a seção 8.1 logo abaixo. |
+
+### 8.1. Diagnóstico do Caddy (HTTPS e domínio)
+
+O Caddy é o programa que recebe os acessos pelo domínio e cuida do HTTPS
+(veja a seção 2). Quando ele falha, o site não abre ou o contêiner `caddy`
+fica reiniciando.
+
+**Passo 1 — colete as informações.** Na VPS, dentro da pasta do projeto:
+
+```bash
+cd ~/reservas-salas
+```
+```bash
+docker compose -f docker-compose.producao.yml --env-file .env.producao logs caddy --tail 40
+```
+```bash
+grep -E "^(DOMINIO|APP_URL)=" .env.producao
+```
+```bash
+ls -la Caddyfile
+```
+```bash
+sudo ss -tlnp | grep -E ":(80|443) "
+```
+
+Esses comandos mostram só o domínio e o endereço, sem senhas. Se for pedir
+ajuda, **nunca** envie o `.env.producao` inteiro: ele contém a senha do banco e
+o segredo das sessões.
+
+**Passo 2 — encontre o erro na tabela.**
+
+| Mensagem ou sintoma | Causa | Solução |
+|---|---|---|
+| `required variable DOMINIO is missing` ou `Defina DOMINIO no .env.producao` | O comando foi rodado sem `--env-file .env.producao`, ou `DOMINIO` está vazio. | Use sempre o comando completo (seção 2.5) e confira o `DOMINIO` com o `grep` acima. |
+| `adapting config using caddyfile`… `unrecognized`, `invalid` ou `parsing` | `DOMINIO` em formato errado: com `https://`, barra no final, caminho (`/admin`) ou espaços. | `DOMINIO` deve ser **só o nome**: `reservas.seudominio.com.br`. Quem leva `https://` é o `APP_URL`. Exceção: a opção só com IP (seção 3.1, opção B) usa `http://IP`. |
+| `ls -la Caddyfile` mostra `drwx…` (uma **pasta**), ou o log diz `is a directory` / `not a directory` | O comando foi rodado fora da pasta do projeto e o Docker criou uma pasta vazia chamada `Caddyfile`. | Pare tudo (`docker compose -f docker-compose.producao.yml --env-file .env.producao down`), apague a pasta (`rmdir Caddyfile`), recupere o arquivo (`git checkout -- Caddyfile`) e suba de novo **de dentro** de `~/reservas-salas`. |
+| `bind: address already in use` (portas 80 ou 443) | Outro programa já usa as portas; muitas VPS vêm com Apache ou Nginx. O comando `ss` mostra qual. | `sudo systemctl stop apache2 nginx` e `sudo systemctl disable apache2 nginx`. Depois suba o sistema de novo. |
+| `challenge failed`, `timeout during connect`, `no valid A records`, `NXDOMAIN` | O Let's Encrypt não conseguiu confirmar o domínio: o DNS ainda não aponta para o IP da VPS, ou as portas 80/443 estão bloqueadas. | Confira `nslookup SEU-DOMINIO` (deve mostrar o IP da VPS). Libere 80 e 443 no `ufw` **e** no firewall do painel do provedor. Aguarde a propagação do DNS e reinicie: `docker compose -f docker-compose.producao.yml --env-file .env.producao restart caddy`. |
+| `too many certificates` / `rateLimited` | Muitas tentativas de certificado para o mesmo domínio em pouco tempo. | Corrija o problema de DNS/portas primeiro e aguarde algumas horas antes de tentar de novo. |
+| Domínio usa `reservas.IP` (ex.: `reservas.203.0.113.10`) | Não é um nome válido (veja a seção 3.1). | Use `reservas.203-0-113-10.sslip.io` ou um domínio próprio. |
+| Cloudflare: “too many redirects” ou erro 525/526 | Proxy laranja ativo com SSL “Flexible”. | No Cloudflare, use SSL **Full (strict)**, ou deixe a nuvem cinza (“DNS only”). |
+| O site abre, mas mostra “502 Bad Gateway” | O Caddy está bem; a aplicação (`app`) não está rodando. | Veja `logs app --tail 60` no mesmo formato de comando. Geralmente é a senha do banco (P1000) ou o `AUTH_SECRET`. |
+
+**Passo 3 — depois de corrigir**, aplique as mudanças:
+
+```bash
+docker compose -f docker-compose.producao.yml --env-file .env.producao up -d
+```
+```bash
+docker compose -f docker-compose.producao.yml --env-file .env.producao logs caddy --tail 20
+```
+
+No log, a linha `certificate obtained successfully` indica que o HTTPS foi emitido.
 
 ---
 
