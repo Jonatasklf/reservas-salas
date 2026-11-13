@@ -1,0 +1,32 @@
+# dependências
+node_modules/
+
+# build
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# variáveis de ambiente (contêm segredos)
+.env
+.env.local
+.env.*.local
+
+# banco de dados local (sem Docker)
+.banco-local/
+
+# logs e sistema
+npm-debug.log*
+*.log
+.DS_Store
+Thumbs.db
+coverage/
+.vscode/*
+!.vscode/extensions.json
+
+# escolha do banco feita pelo instalar.bat (docker/local)
+.modo-banco
+
+# configuração local de ferramentas de IA (não faz parte do projeto)
+.claude/

@@ -1,0 +1,26 @@
+# PostgreSQL local para desenvolvimento.
+#   Iniciar:  docker compose up -d
+#   Parar:    docker compose stop
+# Os dados ficam no volume "reservas_dados" e sobrevivem a reinicializações.
+services:
+  banco:
+    image: postgres:18-alpine
+    container_name: reservas-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: reservas
+      POSTGRES_PASSWORD: reservas_local
+      POSTGRES_DB: reservas
+    ports:
+      - "5433:5432"
+    volumes:
+      - reservas_dados:/var/lib/postgresql
+      - ./docker/criar-banco-teste.sql:/docker-entrypoint-initdb.d/criar-banco-teste.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reservas -d reservas"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  reservas_dados:

@@ -1,0 +1,11 @@
+node_modules
+.next
+.banco-local
+.env
+.env.*
+!.env.example
+!.env.producao.example
+.git
+.claude
+coverage
+*.log

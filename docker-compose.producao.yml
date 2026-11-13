@@ -1,0 +1,51 @@
+# =============================================================================
+# PRODUÇÃO: banco + aplicação + HTTPS automático no seu domínio.
+#   docker compose -f docker-compose.producao.yml --env-file .env.producao up -d --build
+# Passo a passo completo em HOSPEDAGEM.md.
+# =============================================================================
+services:
+  banco:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: reservas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env.producao}
+      POSTGRES_DB: reservas
+    volumes:
+      - dados_banco:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reservas -d reservas"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Sem "ports": o banco NÃO fica exposto na internet.
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env.producao
+    environment:
+      NODE_ENV: production
+    depends_on:
+      banco:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO:?Defina DOMINIO no .env.producao}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_dados:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  dados_banco:
+  caddy_dados:
+  caddy_config:

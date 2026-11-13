@@ -1,0 +1,387 @@
+// =============================================================================
+// Modelo de dados — Sistema de Reservas de Salas
+// -----------------------------------------------------------------------------
+// Convenções:
+//  * Instantes (data + hora) são gravados em UTC (timestamptz) e exibidos no
+//    fuso America/Sao_Paulo pela camada de apresentação.
+//  * Datas "de calendário" (sem hora) de reuniões recorrentes usam o tipo
+//    @db.Date e horários locais são strings "HH:mm" (ex.: "19:00").
+//  * Reuniões recorrentes NÃO geram um registro por ocorrência: as ocorrências
+//    são calculadas sob demanda (ver src/server/recurrence.ts).
+//  * Uma restrição de exclusão (EXCLUDE USING gist), criada na migração SQL,
+//    impede duas reservas CONFIRMADAS sobrepostas na mesma sala.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Administradores
+// -----------------------------------------------------------------------------
+model Admin {
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  passwordHash   String
+  active         Boolean   @default(true)
+  /// Incrementado ao trocar a senha/desativar: invalida sessões antigas.
+  sessionVersion Int       @default(1)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+// -----------------------------------------------------------------------------
+// Salas e equipamentos
+// -----------------------------------------------------------------------------
+model Room {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  location    String?
+  capacity    Int
+  /// Horário de funcionamento próprio da sala ("HH:mm"). Nulo = usa o padrão das configurações.
+  openTime    String?
+  closeTime   String?
+  /// Dias da semana em que a sala funciona (0 = domingo ... 6 = sábado).
+  weekdays    Int[]   @default([0, 1, 2, 3, 4, 5, 6])
+  adminNotes  String?
+  active      Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  equipment         RoomEquipment[]
+  requests          ReservationRequest[]
+  reservations      Reservation[]
+  recurringMeetings RecurringMeeting[]
+  blocks            AvailabilityBlock[]
+  exceptionsMoved   RecurrenceException[] @relation("ExceptionNewRoom")
+
+  @@index([active])
+}
+
+model Equipment {
+  id          String  @id @default(cuid())
+  /// Identificador estável (ex.: "projetor"). Usado por regras como "precisa de projetor".
+  key         String  @unique
+  name        String  @unique
+  description String?
+  active      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  rooms            RoomEquipment[]
+  requests         RequestEquipment[]
+  reservations     ReservationEquipment[]
+  recurringMeeting RecurringEquipment[]
+}
+
+model RoomEquipment {
+  roomId      String
+  equipmentId String
+  quantity    Int    @default(1)
+
+  room      Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+
+  @@id([roomId, equipmentId])
+}
+
+// -----------------------------------------------------------------------------
+// Solicitações públicas (fila cronológica)
+// -----------------------------------------------------------------------------
+enum RequestStatus {
+  PENDING        // Aguardando aprovação
+  AWAITING_INFO  // Aguardando informações complementares
+  APPROVED       // Aprovada (gera uma Reservation)
+  REJECTED       // Rejeitada
+  CANCELLED      // Cancelada
+}
+
+model ReservationRequest {
+  id         String @id @default(cuid())
+  /// Número sequencial atribuído pelo banco: garante a ordem de chegada mesmo
+  /// para pedidos recebidos no mesmo milissegundo.
+  sequence   Int    @unique @default(autoincrement())
+  protocol   String @unique
+  /// Hash SHA-256 do código de acesso entregue ao solicitante (consulta segura).
+  accessCodeHash String
+
+  requesterName       String
+  purpose             String
+  roomId              String
+  startAt             DateTime
+  endAt               DateTime
+  participants        Int
+  needsProjector      Boolean  @default(false)
+  otherEquipmentNotes String?
+  contactPhone        String?
+  contactEmail        String?
+
+  status RequestStatus @default(PENDING)
+  /// Horário do servidor de banco no recebimento (não depende do cliente).
+  receivedAt DateTime @default(now())
+
+  /// Mensagem visível ao solicitante na consulta do protocolo.
+  publicMessage    String?
+  /// Justificativa interna (somente administração).
+  internalNotes    String?
+  /// Sugestão de outra sala/horário enviada pela administração.
+  suggestion       String?
+  decidedAt        DateTime?
+  decidedById      String?
+  /// Marcado quando outra aprovação tornou este horário indisponível.
+  availabilityLostAt DateTime?
+
+  reservationId String?      @unique
+  reservation   Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  room      Room               @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  equipment RequestEquipment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, sequence])
+  @@index([roomId, startAt, endAt])
+}
+
+model RequestEquipment {
+  requestId   String
+  equipmentId String
+
+  request   ReservationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  equipment Equipment          @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+
+  @@id([requestId, equipmentId])
+}
+
+// -----------------------------------------------------------------------------
+// Reservas confirmadas (administrativas ou vindas de solicitações aprovadas)
+// -----------------------------------------------------------------------------
+enum ReservationStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum ReservationSource {
+  ADMIN
+  REQUEST
+}
+
+model Reservation {
+  id            String            @id @default(cuid())
+  roomId        String
+  title         String
+  /// Título exibido publicamente (se vazio, exibe "Reservado").
+  publicTitle   String?
+  showPublicTitle Boolean         @default(false)
+  responsible   String
+  startAt       DateTime
+  endAt         DateTime
+  participants  Int
+  notes         String?
+  status        ReservationStatus @default(CONFIRMED)
+  source        ReservationSource @default(ADMIN)
+  createdById   String?
+  cancelledAt   DateTime?
+  cancelReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  room      Room                   @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  equipment ReservationEquipment[]
+  request   ReservationRequest?
+
+  @@index([roomId, startAt, endAt])
+  @@index([status, startAt])
+}
+
+model ReservationEquipment {
+  reservationId String
+  equipmentId   String
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  equipment   Equipment   @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+
+  @@id([reservationId, equipmentId])
+}
+
+// -----------------------------------------------------------------------------
+// Reuniões recorrentes
+// -----------------------------------------------------------------------------
+enum RecurrenceFrequency {
+  DAILY                // Diariamente (a cada N dias)
+  WEEKLY               // Semanalmente nos dias escolhidos
+  BIWEEKLY             // Quinzenalmente nos dias escolhidos
+  MONTHLY_DAY          // Mensalmente no dia N do mês
+  MONTHLY_NTH_WEEKDAY  // Ex.: primeira segunda-feira do mês
+  CUSTOM               // A cada N semanas nos dias escolhidos
+}
+
+enum RecurringStatus {
+  ACTIVE
+  SUSPENDED
+  ENDED
+}
+
+model RecurringMeeting {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+  publicTitle String?
+  showPublicTitle Boolean @default(true)
+  roomId      String
+
+  frequency  RecurrenceFrequency
+  /// Intervalo (ex.: a cada 2 semanas). DAILY/CUSTOM usam este valor.
+  interval   Int   @default(1)
+  /// Dias da semana (0 = domingo ... 6 = sábado), usados por WEEKLY/BIWEEKLY/CUSTOM/MONTHLY_NTH_WEEKDAY.
+  weekdays   Int[] @default([])
+  /// Dia do mês (1..31) para MONTHLY_DAY.
+  monthDay   Int?
+  /// Posição da semana no mês (1..4, ou -1 = última) para MONTHLY_NTH_WEEKDAY.
+  nthWeek    Int?
+  /// Regra RRULE equivalente (gerada automaticamente, para referência/integrações).
+  rrule      String
+
+  startTime String // "HH:mm"
+  endTime   String // "HH:mm"
+  startDate DateTime  @db.Date
+  endDate   DateTime? @db.Date
+
+  participants Int
+  status       RecurringStatus @default(ACTIVE)
+  /// Suspensão temporária: ocorrências entre essas datas (inclusive) não acontecem.
+  suspendedFrom  DateTime? @db.Date
+  suspendedUntil DateTime? @db.Date
+
+  /// Quando "editar ocorrências futuras" divide a série, a nova aponta para a anterior.
+  previousSeriesId String?
+  previousSeries   RecurringMeeting?  @relation("SeriesSplit", fields: [previousSeriesId], references: [id], onDelete: SetNull)
+  nextSeries       RecurringMeeting[] @relation("SeriesSplit")
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  room       Room                  @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  exceptions RecurrenceException[]
+  equipment  RecurringEquipment[]
+
+  @@index([roomId, status])
+}
+
+model RecurringEquipment {
+  recurringMeetingId String
+  equipmentId        String
+
+  recurringMeeting RecurringMeeting @relation(fields: [recurringMeetingId], references: [id], onDelete: Cascade)
+  equipment        Equipment        @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+
+  @@id([recurringMeetingId, equipmentId])
+}
+
+enum ExceptionType {
+  CANCELLED // Ocorrência cancelada
+  MODIFIED  // Ocorrência com outra sala e/ou outro horário
+}
+
+model RecurrenceException {
+  id                 String        @id @default(cuid())
+  recurringMeetingId String
+  /// Data original da ocorrência afetada.
+  originalDate       DateTime      @db.Date
+  type               ExceptionType
+  newRoomId          String?
+  newStartTime       String?
+  newEndTime         String?
+  reason             String?
+  createdById        String?
+  createdAt          DateTime      @default(now())
+
+  recurringMeeting RecurringMeeting @relation(fields: [recurringMeetingId], references: [id], onDelete: Cascade)
+  newRoom          Room?            @relation("ExceptionNewRoom", fields: [newRoomId], references: [id], onDelete: Restrict)
+
+  @@unique([recurringMeetingId, originalDate])
+}
+
+// -----------------------------------------------------------------------------
+// Bloqueios (feriados, manutenção, indisponibilidade eventual)
+// -----------------------------------------------------------------------------
+enum BlockType {
+  HOLIDAY
+  MAINTENANCE
+  OTHER
+}
+
+model AvailabilityBlock {
+  id          String    @id @default(cuid())
+  /// Nulo = bloqueia todas as salas.
+  roomId      String?
+  title       String
+  type        BlockType @default(OTHER)
+  startAt     DateTime
+  endAt       DateTime
+  notes       String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  room Room? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([startAt, endAt])
+}
+
+// -----------------------------------------------------------------------------
+// Auditoria (histórico de decisões administrativas)
+// -----------------------------------------------------------------------------
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String?
+  action     String
+  entityType String
+  entityId   String
+  summary    String
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  admin Admin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// Configurações gerais (registro único, id = 1)
+// -----------------------------------------------------------------------------
+model Settings {
+  id               Int     @id @default(1)
+  unitName         String  @default("Reservas de Salas")
+  headerSubtitle   String? @default("Agenda de salas de reuniões")
+  footerText       String?
+  logoData         Bytes?
+  logoMimeType     String?
+  logoUpdatedAt    DateTime?
+  defaultOpenTime  String  @default("07:00")
+  defaultCloseTime String  @default("22:00")
+  /// Antecedência mínima (minutos) para uma solicitação pública.
+  minAdvanceMinutes Int    @default(60)
+  /// Máximo de dias no futuro para solicitações públicas.
+  maxAdvanceDays   Int     @default(180)
+  /// Exibir títulos públicos das reuniões na página pública.
+  showPublicTitles Boolean @default(true)
+  emailNotifications Boolean @default(false)
+  notificationEmail  String?
+  updatedAt        DateTime @updatedAt
+}
