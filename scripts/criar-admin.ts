@@ -8,8 +8,31 @@
  */
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import fs from 'node:fs';
+import path from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
+
+/**
+ * Lê o arquivo .env da raiz do projeto. Necessário porque scripts avulsos
+ * não passam pelo Next.js, e o Prisma só carrega o .env sozinho se ele já
+ * existia quando as dependências foram instaladas. Variáveis já definidas no
+ * ambiente (ex.: no servidor) têm prioridade.
+ */
+function loadDotEnv() {
+  const file = path.resolve(__dirname, '..', '.env');
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+}
+loadDotEnv();
+
+if (!process.env.DATABASE_URL) {
+  console.error('\nErro: DATABASE_URL não definida. Execute o instalador (ou copie .env.example para .env).');
+  process.exit(1);
+}
 
 const prisma = new PrismaClient();
 
