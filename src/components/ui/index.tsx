@@ -20,7 +20,8 @@ const buttonVariants: Record<ButtonVariant, string> = {
   ghost: 'text-ink-soft hover:bg-mist-soft hover:text-ink',
   danger: 'bg-danger text-white hover:bg-[#8e2924] shadow-sm',
 };
-const buttonSizes = { sm: 'h-8 px-3 text-sm', md: 'h-10 px-4 text-sm', lg: 'h-12 px-5 text-base', icon: 'h-9 w-9' };
+// No celular os botões ficam um pouco maiores (área de toque confortável).
+const buttonSizes = { sm: 'h-9 px-3 text-sm sm:h-8', md: 'h-11 px-4 text-sm sm:h-10', lg: 'h-12 px-5 text-base', icon: 'h-10 w-10 sm:h-9 sm:w-9' };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -56,7 +57,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
 // Campos de formulário
 // -----------------------------------------------------------------------------
 const fieldBase =
-  'w-full rounded-lg border border-mist bg-surface px-3 text-sm text-ink placeholder:text-ink-soft/70 ' +
+  // text-base no celular evita o zoom automático do iPhone ao tocar no campo.
+  'w-full rounded-lg border border-mist bg-surface px-3 text-base text-ink placeholder:text-ink-soft/70 sm:text-sm ' +
   'transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ' +
   'disabled:bg-mist-soft disabled:text-ink-soft aria-[invalid=true]:border-danger';
 
@@ -136,7 +138,7 @@ export function Checkbox({ label, className, ...props }: React.InputHTMLAttribut
 // -----------------------------------------------------------------------------
 // Cartão, selo, alerta, estados
 // -----------------------------------------------------------------------------
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function Card({ className, ...props }: React.ComponentProps<'div'>) {
   return <div className={cn('rounded-[var(--radius-card)] border border-mist/80 bg-surface shadow-[0_1px_2px_rgba(16,24,40,0.04)]', className)} {...props} />;
 }
 

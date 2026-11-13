@@ -95,13 +95,44 @@ function GeneralSettings({ initial, emailConfigured, onSaved }: { initial: Setti
         </div>
         <Checkbox label="Exibir títulos das reuniões na página pública (quando autorizado em cada reserva)" checked={form.showPublicTitles} onChange={(e) => set('showPublicTitles', e.target.checked)} />
         <div className="space-y-2 rounded-lg border border-mist p-3">
-          <Checkbox label="Enviar notificações por e-mail" checked={form.emailNotifications} onChange={(e) => set('emailNotifications', e.target.checked)} />
-          {!emailConfigured && <p className="text-xs text-warning">Nenhum servidor de e-mail (SMTP) configurado no arquivo .env. O sistema funciona normalmente; as mensagens apenas não são enviadas.</p>}
+          <p className="text-sm font-medium">E-mails</p>
+          <p className="text-xs text-ink-soft">
+            Quem informa e-mail na solicitação recebe automaticamente o <strong>protocolo e o código de acesso</strong>, e depois as atualizações (aprovação, rejeição etc.).
+          </p>
+          {emailConfigured ? (
+            <p className="text-xs text-success">Servidor de e-mail (SMTP) configurado.</p>
+          ) : (
+            <p className="text-xs text-warning">Nenhum servidor de e-mail (SMTP) configurado no arquivo .env. O sistema funciona normalmente, mas os e-mails não são enviados (em desenvolvimento, ficam salvos na pasta .emails-enviados). Veja como configurar na seção “E-mail” do HOSPEDAGEM.md.</p>
+          )}
+          <TestEmailButton />
+          <Checkbox label="Avisar a administração por e-mail a cada nova solicitação" checked={form.emailNotifications} onChange={(e) => set('emailNotifications', e.target.checked)} />
           <Field label="E-mail que recebe avisos de novas solicitações" htmlFor="cfg-email" error={fe.notificationEmail}><Input id="cfg-email" type="email" value={form.notificationEmail} onChange={(e) => set('notificationEmail', e.target.value)} /></Field>
         </div>
         <Button type="submit" loading={saving}>Salvar configurações</Button>
       </form>
     </Card>
+  );
+}
+
+function TestEmailButton() {
+  const [state, setState] = useState<{ loading: boolean; message?: string; tone?: 'success' | 'danger' | 'info' }>({ loading: false });
+  async function send() {
+    setState({ loading: true });
+    try {
+      const r = await api<{ result: string; error?: string }>('/api/admin/settings/test-email', { method: 'POST' });
+      if (r.result === 'sent') setState({ loading: false, tone: 'success', message: 'E-mail de teste enviado para o seu endereço de administrador.' });
+      else if (r.result === 'saved') setState({ loading: false, tone: 'info', message: `SMTP não configurado: a mensagem foi salva em ${r.error}` });
+      else if (r.result === 'skipped') setState({ loading: false, tone: 'info', message: 'SMTP não configurado: nenhuma mensagem foi enviada.' });
+      else setState({ loading: false, tone: 'danger', message: `Falha no envio: ${r.error ?? 'erro desconhecido'}` });
+    } catch (e) {
+      setState({ loading: false, tone: 'danger', message: (e as ApiError).message });
+    }
+  }
+  return (
+    <div className="space-y-2">
+      <Button type="button" variant="outline" size="sm" loading={state.loading} onClick={send}>Enviar e-mail de teste</Button>
+      {state.message && <Alert tone={state.tone}>{state.message}</Alert>}
+    </div>
   );
 }
 
@@ -221,6 +252,19 @@ function PasswordSettings() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   useEffect(() => setError(''), [form]);
+  const [revoking, setRevoking] = useState(false);
+
+  async function revokeOthers() {
+    setRevoking(true);
+    try {
+      await api('/api/admin/sessions/revoke', { method: 'POST' });
+      toast('success', 'Sessões em outros aparelhos encerradas.');
+    } catch (err) {
+      toast('danger', (err as ApiError).message);
+    } finally {
+      setRevoking(false);
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -248,6 +292,13 @@ function PasswordSettings() {
         <Field label="Confirmar nova senha" htmlFor="pw-conf"><Input id="pw-conf" type="password" autoComplete="new-password" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} /></Field>
         <Button type="submit" loading={saving}>Alterar senha</Button>
       </form>
+      <div className="mt-5 space-y-2 border-t border-mist pt-4">
+        <p className="text-sm font-medium">Sessões em outros aparelhos</p>
+        <p className="text-xs text-ink-soft">
+          Use se perdeu o celular ou esqueceu o sistema aberto em outro computador. Você continua conectado aqui.
+        </p>
+        <Button type="button" variant="outline" size="sm" loading={revoking} onClick={revokeOthers}>Encerrar sessões em outros aparelhos</Button>
+      </div>
     </Card>
   );
 }

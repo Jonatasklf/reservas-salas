@@ -231,8 +231,11 @@ Siga o caminho que os dados percorrem:
   3. `services/requests.ts`: inclua `department: input.department` no `create`;
   4. `components/public/request-dialog.tsx`: adicione o `Field` e o valor no estado `form`;
   5. `components/admin/requests-page.tsx`: exiba o campo no detalhe.
-- **Regras de notificação:** `notifyRequester` e o envio ao administrador em
-  `src/server/services/requests.ts`. O transporte de e-mail fica em `src/lib/email.ts`.
+- **Textos dos e-mails:** `src/server/emails.ts` (confirmação com protocolo,
+  atualizações e aviso à administração).
+- **Quando cada e-mail é enviado:** `createPublicRequest` e `notifyRequester` em
+  `src/server/services/requests.ts`. O transporte (SMTP) fica em `src/lib/email.ts`.
+  Para configurar o SMTP, veja [HOSPEDAGEM.md, seção 9](HOSPEDAGEM.md#9-e-mail-envio-do-protocolo).
 - **Regras de antecedência e horários padrão:** tela **Configurações**. Duração
   mínima, passo dos horários e horizonte de recorrência ficam em `src/config/site.ts`.
 
@@ -262,6 +265,17 @@ Os cenários obrigatórios do projeto estão cobertos:
 | 10 | Duas aprovações simultâneas: só uma é confirmada | `requests.integration.test.ts` |
 | 11 | Horários consecutivos são permitidos | `availability.test.ts`, `requests.integration.test.ts` |
 | 12 | Horário no passado é impedido | `availability.test.ts`, `requests.integration.test.ts` |
+
+Além desses:
+
+- `security.integration.test.ts` testa **todas** as rotas administrativas sem
+  login, tokens forjados, expirados ou sem assinatura, encerramento de
+  sessões, CSRF, envios gigantes e privacidade da API pública.
+- `email.integration.test.ts` confere que o protocolo e o código são enviados
+  por e-mail e que o conteúdo digitado é escapado.
+
+**Ao criar uma rota administrativa nova, o teste de segurança a encontra
+sozinho** e falha se ela responder sem login.
 
 ## 12. Como enviar atualizações ao GitHub
 

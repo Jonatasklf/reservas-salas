@@ -20,8 +20,9 @@ import crypto from 'node:crypto';
 import type { Prisma, RequestStatus } from '@prisma/client';
 import { prisma, transaction, lockRooms, type Db } from '@/lib/db';
 import { AppError, conflict, notFound } from '@/lib/errors';
-import { sendEmail } from '@/lib/email';
-import { formatDateShort, formatRange, utcToDateString, zonedToUtc } from '@/lib/time';
+import { sendEmail, type EmailResult } from '@/lib/email';
+import { adminNewRequestEmail, requestReceivedEmail, requestUpdateEmail } from '../emails';
+import { utcToDateString, zonedToUtc } from '@/lib/time';
 import { siteConfig } from '@/config/site';
 import type { DecisionInput, PublicRequestInput } from '@/lib/validation';
 import { checkRoomAvailability, findCompetingRequests, overlaps } from '../availability';
@@ -62,6 +63,9 @@ export interface CreateRequestResult {
   status: RequestStatus;
   warnings: string[];
   hasCompetition: boolean;
+  /** sent = e-mail com o protocolo enviado; not_requested = sem e-mail informado. */
+  emailStatus: 'sent' | 'failed' | 'not_configured' | 'not_requested';
+  email: string | null;
 }
 
 export async function createPublicRequest(input: PublicRequestInput, now: Date = new Date()): Promise<CreateRequestResult> {
@@ -134,15 +138,16 @@ export async function createPublicRequest(input: PublicRequestInput, now: Date =
     where: { id: { not: created.id }, roomId: room.id, status: { in: OPEN_STATUSES }, startAt: { lt: endAt }, endAt: { gt: startAt } },
   });
 
+  // E-mails: confirmação ao solicitante (com protocolo e código) e aviso à administração.
   const settings = await getSettings();
+  const info = { protocol: created.protocol, requesterName: created.requesterName, roomName: room.name, startAt, endAt, participants: created.participants };
+  let emailStatus: CreateRequestResult['emailStatus'] = 'not_requested';
+  if (created.contactEmail) {
+    const result = await withTimeout(sendEmail(requestReceivedEmail(settings.unitName, created.contactEmail, info, accessCode)), 12_000);
+    emailStatus = result === 'sent' || result === 'saved' ? 'sent' : result === 'skipped' ? 'not_configured' : 'failed';
+  }
   if (settings.emailNotifications && settings.notificationEmail) {
-    void sendEmail(
-      settings.notificationEmail,
-      `Nova solicitação de reserva ${created.protocol}`,
-      `Uma nova solicitação foi recebida.\n\nProtocolo: ${created.protocol}\nSala: ${room.name}\n` +
-        `Data: ${formatDateShort(input.date)} — ${formatRange(startAt, endAt)}\n\n` +
-        `Acesse o painel: ${process.env.APP_URL ?? ''}/admin/solicitacoes`,
-    );
+    void sendEmail(adminNewRequestEmail(settings.unitName, settings.notificationEmail, info));
   }
 
   return {
@@ -152,7 +157,14 @@ export async function createPublicRequest(input: PublicRequestInput, now: Date =
     status: created.status,
     warnings,
     hasCompetition: competing > 0,
+    emailStatus,
+    email: created.contactEmail,
   };
+}
+
+/** Não deixa um servidor de e-mail lento travar o envio do pedido. */
+async function withTimeout(p: Promise<EmailResult>, ms: number): Promise<EmailResult> {
+  return Promise.race([p, new Promise<EmailResult>((resolve) => setTimeout(() => resolve('failed'), ms))]);
 }
 
 /** Outras salas ativas que comportam o pedido no mesmo horário. */
@@ -309,21 +321,21 @@ export async function decideRequest(id: string, input: DecisionInput, adminId: s
         allowed: OPEN_STATUSES, to: 'REJECTED', action: 'REQUEST_REJECTED',
         summary: `Solicitação rejeitada. Justificativa: ${input.reason}`,
         data: { internalNotes: input.reason, publicMessage: input.publicMessage ?? input.reason },
-        notify: 'Sua solicitação foi rejeitada.',
+        notify: 'Solicitação não aprovada',
       });
     case 'request_info':
       return simpleTransition(id, adminId, {
         allowed: OPEN_STATUSES, to: 'AWAITING_INFO', action: 'REQUEST_INFO_REQUESTED',
         summary: `Informações complementares solicitadas: ${input.message}`,
         data: { publicMessage: input.message }, decided: false,
-        notify: 'A administração precisa de informações complementares sobre sua solicitação.',
+        notify: 'A administração precisa de mais informações',
       });
     case 'suggest':
       return simpleTransition(id, adminId, {
         allowed: OPEN_STATUSES, to: 'AWAITING_INFO', action: 'REQUEST_SUGGESTION',
         summary: `Sugestão enviada: ${input.suggestion}`,
         data: { suggestion: input.suggestion }, decided: false,
-        notify: 'A administração sugeriu outra sala ou horário para sua solicitação.',
+        notify: 'Sugestão de outra sala ou horário',
       });
     case 'reopen':
       return simpleTransition(id, adminId, {
@@ -473,7 +485,7 @@ export async function approveRequest(
     }
     return { request: updated, reservation, lostAvailability: lost.map((l) => l.protocol) };
   });
-  notifyRequester(result.request, 'Sua solicitação foi APROVADA. A reserva está confirmada.');
+  notifyRequester(result.request, 'Solicitação aprovada: reserva confirmada');
   return result;
 }
 
@@ -497,21 +509,32 @@ async function cancelRequest(id: string, reason: string, adminId: string) {
     await audit(tx, { adminId, action: 'REQUEST_CANCELLED', entityType: 'ReservationRequest', entityId: id, summary: `Solicitação cancelada: ${reason}` });
     return u;
   });
-  notifyRequester(updated, 'Sua solicitação foi cancelada.');
+  notifyRequester(updated, 'Solicitação cancelada');
   return updated;
 }
 
-function notifyRequester(req: { contactEmail: string | null; protocol: string; publicMessage?: string | null; suggestion?: string | null }, headline: string) {
+/**
+ * Avisa o solicitante (se ele informou e-mail) sobre a mudança de situação.
+ * Executa em segundo plano: a decisão do administrador não espera o e-mail.
+ */
+function notifyRequester(req: { id: string; contactEmail: string | null }, headline: string) {
   if (!req.contactEmail) return;
-  void getSettings().then((s) => {
-    if (!s.emailNotifications) return;
-    const extra = [req.publicMessage && `Mensagem: ${req.publicMessage}`, req.suggestion && `Sugestão: ${req.suggestion}`].filter(Boolean).join('\n');
-    return sendEmail(
-      req.contactEmail!,
-      `Solicitação ${req.protocol} — atualização`,
-      `${headline}\n\nProtocolo: ${req.protocol}\n${extra}\n\nConsulte a situação em: ${process.env.APP_URL ?? ''}/protocolo`,
+  void (async () => {
+    const [s, full] = await Promise.all([
+      getSettings(),
+      prisma.reservationRequest.findUnique({ where: { id: req.id }, include: { room: { select: { name: true } } } }),
+    ]);
+    if (!full?.contactEmail) return;
+    await sendEmail(
+      requestUpdateEmail(
+        s.unitName,
+        full.contactEmail,
+        { protocol: full.protocol, requesterName: full.requesterName, roomName: full.room.name, startAt: full.startAt, endAt: full.endAt, participants: full.participants },
+        headline,
+        { publicMessage: full.publicMessage, suggestion: full.suggestion },
+      ),
     );
-  });
+  })().catch((err) => console.error('[e-mail] Falha ao notificar solicitante:', err));
 }
 
 /** Indicador para o menu: quantidade de solicitações em aberto. */

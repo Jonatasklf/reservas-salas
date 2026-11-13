@@ -30,3 +30,6 @@ coverage/
 
 # configuração local de ferramentas de IA (não faz parte do projeto)
 .claude/
+
+# e-mails salvos em desenvolvimento (sem SMTP)
+.emails-enviados/

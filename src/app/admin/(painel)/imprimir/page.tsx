@@ -5,6 +5,8 @@ import { getEvents } from '@/server/services/calendar';
 import { getSettings } from '@/server/services/settings';
 import { addDays, formatDateLong, formatDateShort, formatRange, isValidDateString, todayString } from '@/lib/time';
 import { PrintButton } from '@/components/admin/print-button';
+import { redirect } from 'next/navigation';
+import { getAdminFromCookies } from '@/lib/auth/guard';
 
 export const metadata = { title: 'Agenda para impressão' };
 export const dynamic = 'force-dynamic';
@@ -12,6 +14,8 @@ export const dynamic = 'force-dynamic';
 const KIND: Record<string, string> = { RESERVATION: 'Reserva', RECURRING: 'Recorrente', BLOCK: 'Bloqueio', REQUEST: 'Pendente', CANCELLED_OCCURRENCE: 'Cancelada' };
 
 export default async function PrintPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+  // Esta página lê dados direto no servidor: confere a sessão aqui também.
+  if (!(await getAdminFromCookies())) redirect('/admin/login');
   const sp = await searchParams;
   const from = sp.from && isValidDateString(sp.from) ? sp.from : todayString();
   let to = sp.to && isValidDateString(sp.to) && sp.to >= from ? sp.to : addDays(from, 30);

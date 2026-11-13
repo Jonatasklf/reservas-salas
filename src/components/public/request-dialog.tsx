@@ -34,6 +34,8 @@ interface Success {
   receivedAt: string;
   warnings: string[];
   hasCompetition: boolean;
+  emailStatus: 'sent' | 'failed' | 'not_configured' | 'not_requested';
+  email: string | null;
 }
 
 type Alternative = { id: string; name: string; capacity: number; location: string | null };
@@ -152,6 +154,12 @@ export function RequestDialog({
           {success.hasCompetition && (
             <Alert tone="warning">Já existe outro pedido em análise para este mesmo horário. A administração analisa os pedidos por ordem de chegada.</Alert>
           )}
+          {success.emailStatus === 'sent' && (
+            <Alert tone="success">Enviamos o protocolo e o código de acesso para <strong>{success.email}</strong>. Verifique também a caixa de spam.</Alert>
+          )}
+          {(success.emailStatus === 'failed' || success.emailStatus === 'not_configured') && (
+            <Alert tone="warning">Não foi possível enviar o e-mail de confirmação agora. Anote ou copie o protocolo e o código acima.</Alert>
+          )}
           {success.warnings.map((w) => <Alert key={w} tone="warning">{w}</Alert>)}
         </div>
       </Dialog>
@@ -253,7 +261,7 @@ export function RequestDialog({
         <Field label="Telefone" htmlFor="r-contactPhone" error={errors.contactPhone}>
           <Input id="r-contactPhone" type="tel" autoComplete="tel" placeholder="(11) 91234-5678" value={form.contactPhone} aria-invalid={Boolean(errors.contactPhone)} onChange={(e) => set('contactPhone', e.target.value)} />
         </Field>
-        <Field label="E-mail" htmlFor="r-contactEmail" error={errors.contactEmail}>
+        <Field label="E-mail" htmlFor="r-contactEmail" error={errors.contactEmail} hint="Recomendado: você receberá o protocolo por e-mail.">
           <Input id="r-contactEmail" type="email" autoComplete="email" placeholder="nome@exemplo.com" value={form.contactEmail} aria-invalid={Boolean(errors.contactEmail)} onChange={(e) => set('contactEmail', e.target.value)} />
         </Field>
 

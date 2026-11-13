@@ -16,12 +16,26 @@ export interface SessionPayload {
   ver: number; // sessionVersion
 }
 
-function secretKey(): Uint8Array {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error('AUTH_SECRET ausente ou muito curto (mínimo de 32 caracteres). Configure o arquivo .env.');
+/** Valores de exemplo publicados no repositório: nunca podem ser usados como segredo. */
+const EXAMPLE_SECRETS = ['troque-por-um-segredo', 'gere-um-segredo', 'segredo-de-teste'];
+
+export function authSecretProblem(secret = process.env.AUTH_SECRET): string | null {
+  if (!secret || secret.length < 32) return 'AUTH_SECRET ausente ou muito curto (mínimo de 32 caracteres).';
+  const isTestEnv = process.env.NODE_ENV === 'test';
+  if (!isTestEnv && EXAMPLE_SECRETS.some((s) => secret.includes(s))) {
+    return 'AUTH_SECRET ainda é o valor de exemplo do repositório. Gere um segredo aleatório.';
   }
-  return new TextEncoder().encode(secret);
+  return null;
+}
+
+function secretKey(): Uint8Array {
+  const problem = authSecretProblem();
+  if (problem) {
+    // Sem segredo válido ninguém consegue entrar (e ninguém consegue forjar sessões).
+    console.error(`[segurança] ${problem} Execute: node scripts/preparar-env.mjs ou veja o README.`);
+    throw new Error(problem);
+  }
+  return new TextEncoder().encode(process.env.AUTH_SECRET);
 }
 
 export function sessionMaxAgeSeconds(): number {

@@ -6,15 +6,18 @@ import { z } from 'zod';
 import { isValidDateString, isValidTimeString, timeToMinutes } from './time';
 import { siteConfig } from '@/config/site';
 
+// Mensagens padrão do zod em português (as mensagens personalizadas abaixo têm prioridade).
+z.config(z.locales.pt());
+
 const msgRequired = 'Campo obrigatório.';
 
 export const dateStr = z
-  .string({ required_error: msgRequired })
+  .string({ error: msgRequired })
   .refine(isValidDateString, 'Data inválida (use o formato AAAA-MM-DD).');
 export const timeStr = z
-  .string({ required_error: msgRequired })
+  .string({ error: msgRequired })
   .refine(isValidTimeString, 'Horário inválido (use o formato HH:MM).');
-const text = (max: number) => z.string().trim().max(max, `Máximo de ${max} caracteres.`);
+const text = (max: number) => z.string({ error: msgRequired }).trim().max(max, `Máximo de ${max} caracteres.`);
 const requiredText = (max: number) => text(max).min(1, msgRequired);
 const optionalText = (max: number) =>
   z
@@ -26,7 +29,7 @@ const optionalText = (max: number) =>
     .transform((v) => (v ? v : null));
 const intFrom = (min: number, max: number) =>
   z.coerce
-    .number({ invalid_type_error: 'Informe um número.' })
+    .number({ error: 'Informe um número.' })
     .int('Informe um número inteiro.')
     .min(min, `O valor mínimo é ${min}.`)
     .max(max, `O valor máximo é ${max}.`);
@@ -48,7 +51,7 @@ export const publicRequestSchema = z
       'Informe o nome completo (nome e sobrenome).',
     ),
     purpose: requiredText(siteConfig.requestForm.purposeMaxLength),
-    roomId: z.string().min(1, 'Selecione uma sala.'),
+    roomId: z.string({ error: 'Selecione uma sala.' }).min(1, 'Selecione uma sala.'),
     date: dateStr,
     startTime: timeStr,
     endTime: timeStr,
@@ -136,7 +139,7 @@ export const equipmentSchema = z.object({
 
 export const adminReservationSchema = z
   .object({
-    roomId: z.string().min(1, 'Selecione uma sala.'),
+    roomId: z.string({ error: 'Selecione uma sala.' }).min(1, 'Selecione uma sala.'),
     title: requiredText(160),
     publicTitle: optionalText(160),
     showPublicTitle: z.boolean().default(false),
@@ -160,7 +163,7 @@ export const recurringSchema = z
     description: optionalText(1000),
     publicTitle: optionalText(160),
     showPublicTitle: z.boolean().default(true),
-    roomId: z.string().min(1, 'Selecione uma sala.'),
+    roomId: z.string({ error: 'Selecione uma sala.' }).min(1, 'Selecione uma sala.'),
     frequency: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY_DAY', 'MONTHLY_NTH_WEEKDAY', 'CUSTOM']),
     interval: intFrom(1, 52).default(1),
     weekdays: weekdays.default([]),

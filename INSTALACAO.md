@@ -204,6 +204,46 @@ números). Depois disso, outros administradores podem ser criados pela tela
 O **modo desenvolvimento** recarrega a página automaticamente quando o código é
 alterado. É o ideal para quem vai modificar o sistema.
 
+### Testar no celular (mesma rede Wi-Fi)
+
+Por segurança, o `iniciar` só aceita acessos do **próprio computador**. Para abrir
+no celular durante os testes:
+
+1. Encerre o sistema (`parar.bat` / `./parar.sh`).
+2. Inicie o banco: `npm run db:start` (ou `docker compose up -d banco`, se usa Docker).
+3. Rode `npm run dev:rede`.
+4. Descubra o IP do computador:
+   - Windows: `ipconfig` (linha “Endereço IPv4”, ex.: `192.168.0.15`);
+   - macOS: `ipconfig getifaddr en0`;
+   - Linux: `hostname -I`.
+5. No celular, conectado ao **mesmo Wi-Fi**, abra `http://192.168.0.15:3000` (troque pelo seu IP).
+6. No Windows, se não abrir, permita o Node.js quando o Firewall perguntar.
+
+> Use `dev:rede` apenas em redes confiáveis (casa, escritório) e encerre depois
+> (`Ctrl+C`): enquanto ele roda, qualquer aparelho da rede consegue acessar.
+
+**Dica:** no celular, use **“Adicionar à tela inicial”** (iPhone/Safari: botão
+Compartilhar; Android/Chrome: menu ⋮). O sistema abre em tela cheia, como um aplicativo.
+
+### Atualizar sua cópia depois de mudanças no GitHub
+
+Windows:
+
+```bat
+cd C:\Projetos\reservas-salas
+```
+```bat
+git pull
+```
+```bat
+instalar.bat
+```
+
+macOS/Linux: `git pull` e depois `./instalar.sh`.
+
+O instalador mantém seu `.env` e seus dados: ele só instala dependências novas e
+aplica migrações do banco. Quando ele perguntar pelos dados fictícios, responda **N**.
+
 ---
 
 ## 7. Comandos manuais (qualquer sistema)
@@ -234,6 +274,7 @@ Outros comandos úteis:
 | `npm run build` | Gera a versão de produção |
 | `npm run db:studio` | Abre um visualizador do banco no navegador |
 | `npm run db:stop` | Encerra o PostgreSQL local |
+| `npm run dev:rede` | Inicia acessível pelo celular na mesma rede Wi-Fi |
 
 ---
 

@@ -13,7 +13,15 @@ export async function middleware(req: NextRequest) {
   // CSRF: requisições que alteram dados devem vir do próprio site.
   if (pathname.startsWith('/api/') && !SAFE_METHODS.has(req.method)) {
     const origin = req.headers.get('origin');
-    if (origin && new URL(origin).host !== req.headers.get('host')) {
+    let foreignOrigin = false;
+    try {
+      foreignOrigin = Boolean(origin) && new URL(origin!).host !== req.headers.get('host');
+    } catch {
+      foreignOrigin = true; // Origin malformado
+    }
+    // Sec-Fetch-Site é enviado pelos navegadores modernos e não pode ser forjado por páginas.
+    const crossSite = req.headers.get('sec-fetch-site') === 'cross-site';
+    if (foreignOrigin || crossSite) {
       return NextResponse.json({ error: { code: 'FORBIDDEN', message: 'Origem não permitida.' } }, { status: 403 });
     }
   }

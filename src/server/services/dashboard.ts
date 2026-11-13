@@ -6,6 +6,7 @@ import { addDays, todayString } from '@/lib/time';
 import { findCompetingRequests } from '../availability';
 import { getEvents } from './calendar';
 import { OPEN_STATUSES, listQueue } from './requests';
+import { securityAlerts } from './admins';
 
 export async function getDashboard(now = new Date()) {
   const today = todayString(now);
@@ -28,7 +29,9 @@ export async function getDashboard(now = new Date()) {
     ]);
 
   const competing = findCompetingRequests(queue);
+  const security = await securityAlerts(now);
   const attention = [
+    ...security,
     ...queue
       .filter((r) => r.currentIssues.length > 0)
       .map((r) => ({

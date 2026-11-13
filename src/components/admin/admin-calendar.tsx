@@ -3,7 +3,7 @@
  * Calendário administrativo: ocupação de todas as salas (reservas,
  * recorrências, bloqueios e pedidos pendentes) + gestão de bloqueios.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Ban, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Badge, Button, Card, Checkbox, Dialog, Field, Input, PageHeader, Select, Spinner, Textarea, useToast } from '@/components/ui';
@@ -25,6 +25,15 @@ interface EventDto {
   title: string;
   refId: string;
 }
+
+/** Cor do ponto exibido no celular (visão mensal). */
+const dot: Record<EventDto['kind'], string> = {
+  RESERVATION: 'bg-primary',
+  RECURRING: 'bg-recurring',
+  BLOCK: 'bg-danger',
+  REQUEST: 'bg-warning',
+  CANCELLED_OCCURRENCE: 'bg-mist',
+};
 
 const chip: Record<EventDto['kind'], string> = {
   RESERVATION: 'bg-primary-soft text-primary',
@@ -49,6 +58,7 @@ export function AdminCalendar() {
   const [roomId, setRoomId] = useState('');
   const [showCancelled, setShowCancelled] = useState(false);
   const [newReservation, setNewReservation] = useState<string | null>(null);
+  const dayPanelRef = useRef<HTMLDivElement>(null);
   const rooms = useRooms();
 
   const monthFirst = anchor.slice(0, 8) + '01';
@@ -70,6 +80,15 @@ export function AdminCalendar() {
     } else setAnchor(addDays(anchor, 7 * dir));
   }
 
+  /** Seleciona o dia; no celular, rola até a lista de ocupações daquele dia. */
+  function pickDay(d: string) {
+    setSelected(d);
+    if (window.innerWidth < 1280) {
+      const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(() => dayPanelRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' }), 50);
+    }
+  }
+
   const monthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${monthFirst}T12:00:00Z`));
   const selectedEvents = byDay(selected);
 
@@ -85,9 +104,9 @@ export function AdminCalendar() {
         <span className="text-base font-semibold first-letter:uppercase">
           {view === 'month' ? monthLabel : `${formatDateShort(days[0])} a ${formatDateShort(days[6])}`}
         </span>
-        <div className="ml-auto flex flex-wrap items-center gap-3">
+        <div className="flex w-full flex-wrap items-center gap-3 sm:ml-auto sm:w-auto">
           <Checkbox label="Mostrar canceladas" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />
-          <Select aria-label="Filtrar sala" className="h-9 w-48" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+          <Select aria-label="Filtrar sala" className="h-9 w-full sm:w-48" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
             <option value="">Todas as salas</option>
             {rooms.data?.rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </Select>
@@ -107,37 +126,53 @@ export function AdminCalendar() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
         <Card className={cn('overflow-hidden', cal.loading && 'opacity-70')}>
-          <div className="grid grid-cols-7 border-b border-mist/70 bg-mist-soft/60 text-center text-xs font-semibold uppercase text-ink-soft">
+          {/* Cabeçalho dos dias: na visão semanal do celular os dias ficam empilhados e ele some. */}
+          <div className={cn('grid-cols-7 border-b border-mist/70 bg-mist-soft/60 text-center text-xs font-semibold uppercase text-ink-soft', view === 'week' ? 'hidden sm:grid' : 'grid')}>
             {siteConfig.weekdayShort.map((d) => <div key={d} className="py-2">{d}</div>)}
           </div>
-          <div className="grid grid-cols-7">
+          <div className={cn(view === 'week' ? 'grid grid-cols-1 sm:grid-cols-7' : 'grid grid-cols-7')}>
             {days.map((d) => {
               const evs = byDay(d);
               const outside = view === 'month' && d.slice(0, 7) !== monthFirst.slice(0, 7);
               const max = view === 'month' ? 3 : 20;
+              const kinds = [...new Set(evs.map((e) => e.kind))];
               return (
                 <button
                   key={d}
-                  onClick={() => setSelected(d)}
+                  onClick={() => pickDay(d)}
                   aria-pressed={d === selected}
                   aria-label={`${formatDateLong(d)}: ${evs.length} item(ns)`}
                   className={cn(
                     'flex flex-col gap-1 border-b border-r border-mist/50 p-1.5 text-left align-top transition-colors hover:bg-mist-soft/50',
-                    view === 'month' ? 'min-h-[104px]' : 'min-h-[320px]',
+                    view === 'month' ? 'min-h-[64px] sm:min-h-[104px]' : 'min-h-[56px] sm:min-h-[320px]',
                     outside && 'bg-canvas/60 text-ink-soft',
                     d === selected && 'ring-2 ring-inset ring-primary',
                   )}
                 >
-                  <span className={cn('inline-flex h-6 w-6 items-center justify-center rounded-full text-xs', d === today && 'bg-primary font-semibold text-white')}>
-                    {Number(d.slice(8))}
+                  <span className="flex items-center gap-2">
+                    <span className={cn('inline-flex h-6 w-6 items-center justify-center rounded-full text-xs', d === today && 'bg-primary font-semibold text-white')}>
+                      {Number(d.slice(8))}
+                    </span>
+                    {view === 'week' && <span className="text-xs font-medium text-ink-soft sm:hidden">{siteConfig.weekdayLabels[weekdayOf(d)]}</span>}
                   </span>
+                  {/* Celular, visão mensal: pontos coloridos por tipo + quantidade. */}
+                  {view === 'month' && evs.length > 0 && (
+                    <span className="flex flex-wrap items-center gap-0.5 sm:hidden" aria-hidden>
+                      {kinds.slice(0, 3).map((k) => <span key={k} className={cn('h-1.5 w-1.5 rounded-full', dot[k])} />)}
+                      <span className="text-[10px] text-ink-soft">{evs.length}</span>
+                    </span>
+                  )}
                   {evs.slice(0, max).map((e) => (
-                    <span key={e.id + d} className={cn('truncate rounded px-1.5 py-0.5 text-[11px] leading-tight', chip[e.kind])} title={`${e.roomName}: ${e.title}`}>
+                    <span
+                      key={e.id + d}
+                      className={cn('truncate rounded px-1.5 py-0.5 text-[11px] leading-tight', chip[e.kind], view === 'month' && 'hidden sm:block')}
+                      title={`${e.roomName}: ${e.title}`}
+                    >
                       {e.kind !== 'BLOCK' && <span className="tabular-nums">{utcToTimeString(new Date(e.startAt))} </span>}
                       {view === 'week' ? `${e.roomName} · ${e.title}` : e.title}
                     </span>
                   ))}
-                  {evs.length > max && <span className="text-[11px] text-ink-soft">+ {evs.length - max}</span>}
+                  {evs.length > max && <span className="hidden text-[11px] text-ink-soft sm:block">+ {evs.length - max}</span>}
                 </button>
               );
             })}
@@ -145,7 +180,7 @@ export function AdminCalendar() {
           {cal.loading && <Spinner className="py-3" />}
         </Card>
 
-        <Card className="h-fit p-4">
+        <Card ref={dayPanelRef} className="h-fit scroll-mt-20 p-4">
           <div className="mb-3 flex items-start justify-between gap-2">
             <h2 className="text-sm font-semibold">{formatDateLong(selected)}</h2>
             {selected >= today && <Button size="sm" onClick={() => setNewReservation(selected)}><Plus className="h-4 w-4" aria-hidden />Reserva</Button>}

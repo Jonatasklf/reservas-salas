@@ -12,7 +12,7 @@ services:
       POSTGRES_PASSWORD: reservas_local
       POSTGRES_DB: reservas
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432" # só acessível neste computador
     volumes:
       - reservas_dados:/var/lib/postgresql
       - ./docker/criar-banco-teste.sql:/docker-entrypoint-initdb.d/criar-banco-teste.sql:ro

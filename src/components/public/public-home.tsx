@@ -3,10 +3,10 @@
  * Página inicial pública:
  *   calendário (mensal/semanal) → dia selecionado → cartões das salas → solicitar reserva.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { ptBR } from 'react-day-picker/locale';
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Filter, SearchX } from 'lucide-react';
+import { CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Filter, SearchX } from 'lucide-react';
 import { Badge, Button, Card, Checkbox, EmptyState, Field, Input, Select, Spinner } from '@/components/ui';
 import { useFetch } from '@/lib/client';
 import { addDays, formatDateLong, formatTime, utcToTimeString, weekdayOf } from '@/lib/time';
@@ -38,6 +38,9 @@ export function PublicHome({ today, settings, equipment }: Props) {
   const [filters, setFilters] = useState({ startTime: '', endTime: '', participants: '', projector: false, equipment: [] as string[] });
   const [debounced, setDebounced] = useState(filters);
   const [requestFor, setRequestFor] = useState<RequestPrefill | null>(null);
+  // Filtros recolhidos no celular (sempre visíveis no computador).
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const roomsRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(filters), 300);
@@ -81,6 +84,17 @@ export function PublicHome({ today, settings, equipment }: Props) {
     const m = toDate(d.slice(0, 8) + '01');
     if (m.getTime() !== month.getTime()) setMonth(m);
   }
+
+  /** No celular, ao tocar em um dia do calendário, rola até as salas daquele dia. */
+  function pickDateFromCalendar(d: string) {
+    selectDate(d);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setTimeout(() => roomsRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }), 50);
+    }
+  }
+
+  const activeFilters =
+    (filters.startTime && filters.endTime ? 1 : 0) + (filters.participants ? 1 : 0) + (filters.projector ? 1 : 0) + filters.equipment.length;
 
   function openRequest(room: DayRoom) {
     setRequestFor({
@@ -127,7 +141,7 @@ export function PublicHome({ today, settings, equipment }: Props) {
                 required
                 locale={ptBR}
                 selected={toDate(selected)}
-                onSelect={(d) => d && selectDate(toStr(d))}
+                onSelect={(d) => d && pickDateFromCalendar(toStr(d))}
                 month={month}
                 onMonthChange={setMonth}
                 captionLayout="dropdown"
@@ -140,7 +154,7 @@ export function PublicHome({ today, settings, equipment }: Props) {
               />
             </div>
           ) : (
-            <WeekView weekStart={weekStart} selected={selected} today={today} events={calendar.data?.events ?? []} loading={calendar.loading} onSelect={selectDate} />
+            <WeekView weekStart={weekStart} selected={selected} today={today} events={calendar.data?.events ?? []} loading={calendar.loading} onSelect={pickDateFromCalendar} />
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-mist/70 pt-3 text-xs text-ink-soft">
@@ -152,11 +166,20 @@ export function PublicHome({ today, settings, equipment }: Props) {
         </Card>
 
         <Card className="p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+          {/* No celular é um botão que abre/fecha; no computador fica sempre aberto. */}
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((o) => !o)}
+            aria-expanded={filtersOpen}
+            aria-controls="painel-filtros"
+            className="flex w-full items-center gap-2 text-left text-base font-semibold lg:pointer-events-none"
+          >
             <Filter className="h-4 w-4 text-primary-muted" aria-hidden />
             Filtrar disponibilidade
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
+            {activeFilters > 0 && <Badge tone="primary">{activeFilters} ativo(s)</Badge>}
+            <ChevronDown className={`ml-auto h-5 w-5 text-ink-soft transition-transform lg:hidden ${filtersOpen ? 'rotate-180' : ''}`} aria-hidden />
+          </button>
+          <div id="painel-filtros" className={`mt-3 grid-cols-2 gap-3 ${filtersOpen ? 'grid' : 'hidden'} lg:grid`}>
             <Field label="Data" htmlFor="f-data" className="col-span-2">
               <Input id="f-data" type="date" value={selected} onChange={(e) => e.target.value && selectDate(e.target.value)} />
             </Field>
@@ -193,7 +216,7 @@ export function PublicHome({ today, settings, equipment }: Props) {
             </div>
           </div>
           {(filters.startTime || filters.endTime || filters.participants || filters.projector || filters.equipment.length > 0) && (
-            <Button variant="ghost" size="sm" className="mt-3" onClick={() => setFilters({ startTime: '', endTime: '', participants: '', projector: false, equipment: [] })}>
+            <Button variant="ghost" size="sm" className={`mt-3 ${filtersOpen ? '' : 'hidden'} lg:inline-flex`} onClick={() => setFilters({ startTime: '', endTime: '', participants: '', projector: false, equipment: [] })}>
               Limpar filtros
             </Button>
           )}
@@ -201,7 +224,7 @@ export function PublicHome({ today, settings, equipment }: Props) {
       </section>
 
       {/* ------------------------------------------------ Salas do dia */}
-      <section aria-live="polite" aria-label="Salas do dia selecionado">
+      <section ref={roomsRef} aria-live="polite" aria-label="Salas do dia selecionado" className="scroll-mt-4">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">Salas em</p>

@@ -9,7 +9,7 @@ import { Alert, Badge, Button, Card, Checkbox, Dialog, EmptyState, Field, Input,
 import { api, ApiError, useFetch } from '@/lib/client';
 import { formatDateShort, formatDateTime, formatRange, utcToDateString } from '@/lib/time';
 import type { RequestStatusKey } from '@/config/site';
-import { ApiErrorAlert, HistoryList, RequestStatusBadge, useRooms, type HistoryEntry } from './common';
+import { ApiErrorAlert, FilterPanel, HistoryList, RequestStatusBadge, useRooms, type HistoryEntry } from './common';
 
 interface RequestDto {
   id: string;
@@ -86,13 +86,17 @@ export function RequestsPage() {
         ))}
       </div>
 
-      <Card className="mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <FilterPanel
+        activeCount={(roomId ? 1 : 0) + (from ? 1 : 0) + (to ? 1 : 0)}
+        primary={
         <Field label="Buscar" htmlFor="q-busca">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" aria-hidden />
             <Input id="q-busca" className="pl-9" placeholder="Nome, protocolo ou finalidade" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </Field>
+        }
+      >
         <Field label="Sala" htmlFor="q-sala">
           <Select id="q-sala" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
             <option value="">Todas as salas</option>
@@ -101,7 +105,7 @@ export function RequestsPage() {
         </Field>
         <Field label="Reunião a partir de" htmlFor="q-de"><Input id="q-de" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
         <Field label="Até" htmlFor="q-ate"><Input id="q-ate" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
-      </Card>
+      </FilterPanel>
 
       {list.loading && !list.data ? (
         <Spinner />
@@ -113,7 +117,7 @@ export function RequestsPage() {
             <li key={r.id}>
               <button onClick={() => setOpenId(r.id)} className="block w-full text-left">
                 <Card className={`p-4 transition-shadow hover:shadow-md ${r.currentIssues.length && ['PENDING', 'AWAITING_INFO'].includes(r.status) ? 'border-danger/40' : ''}`}>
-                  <div className="flex flex-wrap items-start gap-3">
+                  <div className="flex items-start gap-3">
                     {tab === 'abertas' && (
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary" title="Posição na fila">{i + 1}º</span>
                     )}
@@ -133,8 +137,10 @@ export function RequestsPage() {
                         {r.room.name} · {formatDateShort(utcToDateString(new Date(r.startAt)))}, {formatRange(r.startAt, r.endAt)} ·{' '}
                         <span className={r.participants > r.room.capacity ? 'font-medium text-danger' : ''}>{r.participants}/{r.room.capacity} pessoas</span>
                       </p>
+                      {/* No celular, a data de recebimento fica embaixo (não espreme o texto). */}
+                      <p className="text-xs text-ink-soft sm:hidden">Recebida em <span className="tabular-nums">{formatDateTime(r.receivedAt)}</span></p>
                     </div>
-                    <p className="text-xs text-ink-soft sm:text-right">Recebida em<br /><span className="tabular-nums">{formatDateTime(r.receivedAt)}</span></p>
+                    <p className="hidden shrink-0 text-right text-xs text-ink-soft sm:block">Recebida em<br /><span className="tabular-nums">{formatDateTime(r.receivedAt)}</span></p>
                   </div>
                 </Card>
               </button>

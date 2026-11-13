@@ -17,10 +17,18 @@ export async function login(email: string, password: string, ip: string) {
   const admin = await prisma.admin.findUnique({ where: { email } });
   const ok = await verifyPassword(password, admin?.passwordHash ?? DUMMY_HASH);
   if (!admin || !ok || !admin.active) {
+    if (admin) {
+      // Tentativas erradas em contas existentes ficam registradas (detecção de ataque).
+      await audit(prisma, {
+        adminId: null, action: 'ADMIN_LOGIN_FAILED', entityType: 'Admin', entityId: admin.id,
+        summary: `Tentativa de login sem sucesso (IP ${ip}).`,
+      });
+    }
     throw new AppError(401, 'INVALID_CREDENTIALS', 'E-mail ou senha incorretos.');
   }
   resetRateLimit(`login:${email}`);
   await prisma.admin.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
+  await audit(prisma, { adminId: admin.id, action: 'ADMIN_LOGIN', entityType: 'Admin', entityId: admin.id, summary: `Login realizado (IP ${ip}).` });
   return admin;
 }
 
@@ -72,4 +80,28 @@ export async function changePassword(id: string, current: string, next: string) 
   });
   await audit(prisma, { adminId: id, action: 'ADMIN_PASSWORD_CHANGED', entityType: 'Admin', entityId: id, summary: 'Senha alterada.' });
   return updated;
+}
+
+/** Encerra todas as sessões do administrador (inclusive em outros aparelhos). */
+export async function revokeSessions(id: string) {
+  const updated = await prisma.admin.update({ where: { id }, data: { sessionVersion: { increment: 1 } } });
+  await audit(prisma, { adminId: id, action: 'ADMIN_SESSIONS_REVOKED', entityType: 'Admin', entityId: id, summary: 'Sessões encerradas em todos os aparelhos.' });
+  return updated;
+}
+
+/** Sinais de risco exibidos no painel. */
+export async function securityAlerts(now = new Date()) {
+  const alerts: { type: string; id: string; title: string; detail: string }[] = [];
+  const demo = await prisma.admin.findFirst({ where: { email: 'admin@exemplo.local', active: true } });
+  if (demo) {
+    alerts.push({
+      type: 'DEMO_ADMIN', id: demo.id, title: 'Administrador de demonstração ativo',
+      detail: 'Crie seu próprio administrador e desative admin@exemplo.local em Configurações (a senha dele é pública).',
+    });
+  }
+  const failed = await prisma.auditLog.count({ where: { action: 'ADMIN_LOGIN_FAILED', createdAt: { gte: new Date(now.getTime() - 86400000) } } });
+  if (failed >= 5) {
+    alerts.push({ type: 'FAILED_LOGINS', id: 'failed', title: `${failed} tentativas de login sem sucesso nas últimas 24 horas`, detail: 'Pode ser alguém tentando adivinhar senhas. Use senhas fortes e encerre sessões suspeitas em Configurações.' });
+  }
+  return alerts;
 }

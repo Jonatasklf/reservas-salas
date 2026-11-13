@@ -9,7 +9,7 @@ import { Badge, Button, Card, Checkbox, Dialog, EmptyState, Field, Input, PageHe
 import { api, ApiError, useFetch } from '@/lib/client';
 import { capacityMessage } from '@/server/availability';
 import { addDays, formatDateShort, formatRange, todayString, utcToDateString, utcToTimeString } from '@/lib/time';
-import { ApiErrorAlert, HistoryList, useEquipment, useRooms, type HistoryEntry, type RoomDto } from './common';
+import { ApiErrorAlert, FilterPanel, HistoryList, useEquipment, useRooms, type HistoryEntry, type RoomDto } from './common';
 
 interface ReservationDto {
   id: string;
@@ -67,13 +67,18 @@ export function ReservationsPage() {
         }
       />
 
-      <Card className="mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Field label="Buscar" htmlFor="rf-busca">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" aria-hidden />
-            <Input id="rf-busca" className="pl-9" placeholder="Título ou responsável" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} />
-          </div>
-        </Field>
+      <FilterPanel
+        columns="lg:grid-cols-5"
+        activeCount={(filters.roomId ? 1 : 0) + (filters.status !== 'CONFIRMED' ? 1 : 0)}
+        primary={
+          <Field label="Buscar" htmlFor="rf-busca">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" aria-hidden />
+              <Input id="rf-busca" className="pl-9" placeholder="Título ou responsável" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} />
+            </div>
+          </Field>
+        }
+      >
         <Field label="Sala" htmlFor="rf-sala">
           <Select id="rf-sala" value={filters.roomId} onChange={(e) => setFilters({ ...filters, roomId: e.target.value })}>
             <option value="">Todas</option>
@@ -89,7 +94,7 @@ export function ReservationsPage() {
         </Field>
         <Field label="De" htmlFor="rf-de"><Input id="rf-de" type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} /></Field>
         <Field label="Até" htmlFor="rf-ate"><Input id="rf-ate" type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} /></Field>
-      </Card>
+      </FilterPanel>
       <p className="mb-3 text-xs text-ink-soft">Dica: para consultar reservas antigas (histórico), altere a data inicial para o passado.</p>
 
       {list.loading && !list.data ? (

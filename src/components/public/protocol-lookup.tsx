@@ -21,8 +21,8 @@ interface Result {
 
 const tone = { PENDING: 'warning', AWAITING_INFO: 'warning', APPROVED: 'success', REJECTED: 'danger', CANCELLED: 'neutral' } as const;
 
-export function ProtocolLookup() {
-  const [protocol, setProtocol] = useState('');
+export function ProtocolLookup({ initialProtocol = '' }: { initialProtocol?: string }) {
+  const [protocol, setProtocol] = useState(initialProtocol);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

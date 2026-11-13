@@ -2,6 +2,8 @@
 /**
  * Peças compartilhadas pelas telas administrativas.
  */
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Alert, Badge } from '@/components/ui';
 import { ApiError, useFetch } from '@/lib/client';
 import { formatDateShort, formatDateTime, formatRange, utcToDateString } from '@/lib/time';
@@ -173,6 +175,39 @@ export function StatCard({ label, value, hint, tone = 'primary', icon: Icon }: {
         <p className="mt-1 text-sm text-ink-soft">{label}</p>
         {hint && <p className="text-xs text-ink-soft/80">{hint}</p>}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Painel de filtros: no celular mostra só o filtro principal e um botão
+ * "Mais filtros"; a partir de tablets, mostra tudo lado a lado.
+ */
+export function FilterPanel({
+  primary,
+  children,
+  activeCount = 0,
+  columns = 'lg:grid-cols-4',
+}: {
+  primary: React.ReactNode;
+  children: React.ReactNode;
+  activeCount?: number;
+  columns?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`mb-4 grid gap-3 rounded-[var(--radius-card)] border border-mist/80 bg-surface p-4 sm:grid-cols-2 ${columns}`}>
+      {primary}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex items-center justify-between rounded-lg border border-mist px-3 py-2 text-sm font-medium text-ink sm:hidden"
+      >
+        <span>Mais filtros{activeCount > 0 ? ` (${activeCount} ativo${activeCount > 1 ? 's' : ''})` : ''}</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+      </button>
+      <div className={`${open ? 'grid' : 'hidden'} gap-3 sm:contents`}>{children}</div>
     </div>
   );
 }

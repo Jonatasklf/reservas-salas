@@ -69,7 +69,7 @@ export function Dashboard() {
                 {data.attention.map((a) => (
                   <li key={`${a.type}-${a.id}`}>
                     <Link
-                      href={a.type === 'INACTIVE_ROOM' ? '/admin/reservas' : `/admin/solicitacoes?abrir=${a.id}`}
+                      href={a.type === 'INACTIVE_ROOM' ? '/admin/reservas' : a.type === 'DEMO_ADMIN' || a.type === 'FAILED_LOGINS' ? '/admin/configuracoes' : `/admin/solicitacoes?abrir=${a.id}`}
                       className="block rounded-lg border border-warning/30 bg-warning-soft/60 px-3 py-2 text-sm hover:bg-warning-soft"
                     >
                       <p className="font-medium text-ink">{a.title}</p>

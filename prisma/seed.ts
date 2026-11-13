@@ -76,7 +76,10 @@ async function main() {
   let adminId: string | null = null;
   const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD;
-  if (email && password) {
+  const production = process.env.NODE_ENV === 'production' || (process.env.APP_URL ?? '').startsWith('https://');
+  if (email && password && production) {
+    console.log('[seed] Ambiente de produção detectado: o administrador de demonstração NÃO foi criado. Use "npm run admin:criar".');
+  } else if (email && password) {
     const admin = await prisma.admin.upsert({
       where: { email },
       update: {},

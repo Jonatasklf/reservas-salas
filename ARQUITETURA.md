@@ -150,16 +150,45 @@ pela migração.
   por e-mail) e tempo de resposta uniforme.
 - Sessão: JWT HS256 (`jose`) em cookie `httpOnly`, `SameSite=Lax`, `Secure`
   em produção HTTPS. A expiração é configurável (`SESSION_HOURS`).
-- `sessionVersion`: trocar a senha ou desativar um administrador invalida
-  as sessões existentes.
-- Defesa em profundidade: `middleware.ts` barra `/admin` e `/api/admin`, e
-  cada rota administrativa chama `requireAdmin()`, que consulta o banco.
-- CSRF: requisições que alteram dados com `Origin` de outro site são recusadas.
-- Cabeçalhos: `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`,
-  `Permissions-Policy`; em produção, HSTS via Caddy.
-- Exportação CSV protegida contra injeção de fórmulas.
-- Limitador de tentativas em memória (`src/lib/rate-limit.ts`). Para várias
-  instâncias, substitua por um armazenamento compartilhado.
+- `sessionVersion`: trocar a senha, desativar um administrador ou usar
+  **“Encerrar sessões em outros aparelhos”** invalida as sessões existentes.
+- **Segredo da sessão:** `AUTH_SECRET` precisa ter 32+ caracteres e o sistema
+  **recusa os valores de exemplo** do repositório (senão qualquer pessoa que
+  lesse o GitHub poderia forjar uma sessão de administrador).
+- Defesa em profundidade, em três camadas:
+  1. `middleware.ts` barra `/admin` e `/api/admin`;
+  2. o layout das páginas administrativas confere a sessão no servidor (a
+     página de impressão, que lê dados direto, confere de novo);
+  3. cada rota administrativa usa `adminRoute()` → `requireAdmin()`, que
+     consulta o banco (administrador ativo e versão da sessão).
+  O teste `tests/security.integration.test.ts` percorre **todas** as rotas em
+  `src/app/api/admin/**` e falha se alguma responder sem sessão.
+- CSRF: requisições que alteram dados são recusadas se o `Origin` for de outro
+  site ou se o navegador indicar `Sec-Fetch-Site: cross-site`.
+- Cabeçalhos: **Content-Security-Policy** (só recursos do próprio site, sem
+  iframes de terceiros), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`,
+  `Permissions-Policy`, `Cross-Origin-Opener-Policy`; páginas administrativas
+  com `Cache-Control: no-store`; em produção, HSTS via Caddy.
+- Corpo JSON limitado a 64 KB (protege contra envios gigantes).
+- Logotipo: aceito só se a **assinatura real** do arquivo for PNG/JPG/WEBP.
+- Auditoria de acesso: logins e tentativas erradas ficam no `AuditLog`; o
+  painel alerta com 5+ falhas em 24 h e quando o administrador de
+  demonstração (senha pública) está ativo.
+- Desenvolvimento: `npm run dev` e o PostgreSQL do Docker escutam só em
+  `127.0.0.1` (ninguém da rede acessa). `npm run dev:rede` é a opção
+  explícita para testar no celular.
+- Dependências: `npm audit` sem vulnerabilidades conhecidas. Pacotes
+  internos de ferramentas foram fixados em versões corrigidas via `overrides`
+  no `package.json`. Rode `npm audit` periodicamente.
+- Exportação CSV protegida contra injeção de fórmulas; e-mails escapam todo
+  conteúdo digitado por usuários.
+- Limitador de tentativas em memória (`src/lib/rate-limit.ts`): por IP e por
+  e-mail. O IP vem do cabeçalho `X-Forwarded-For`, confiável atrás do Caddy;
+  sem proxy ele pode ser falsificado, mas o limite por e-mail continua valendo.
+  Para várias instâncias, substitua por um armazenamento compartilhado.
+
+**Sugestões futuras:** verificação em duas etapas (TOTP) para administradores
+e perfis de acesso (ex.: somente leitura).
 
 ## 9. Privacidade (LGPD)
 
@@ -212,10 +241,20 @@ Códigos usados:
 
 ## 12. E-mail
 
-`src/lib/email.ts` usa SMTP (nodemailer) somente se `SMTP_HOST` estiver
-definido **e** a opção estiver ativa em Configurações. Sem configuração, as
-mensagens são apenas registradas no console. Falhas de envio nunca
-interrompem a operação.
+- `src/lib/email.ts`: transporte. Com `SMTP_HOST` envia de verdade. Sem SMTP
+  em desenvolvimento, salva `.eml` em `.emails-enviados/`. Em produção sem
+  SMTP, só registra no log. `sendEmail()` nunca lança erro.
+- `src/server/emails.ts`: **todos os modelos** (texto + HTML com a identidade
+  visual). Para mudar uma mensagem, edite só esse arquivo.
+- Envios:
+  - solicitante: confirmação com protocolo + código, enviada logo após o
+    pedido (com limite de 12 s para não travar a tela; o resultado aparece na
+    confirmação);
+  - solicitante: atualizações (aprovação, rejeição, informações, sugestão,
+    cancelamento), em segundo plano;
+  - administração: aviso de nova solicitação, se ativado em Configurações.
+- O link do e-mail leva o **protocolo** na URL, mas **nunca** o código de acesso.
+- **Configurações → Enviar e-mail de teste** mostra o erro real do SMTP.
 
 ## 13. Banco local sem Docker
 

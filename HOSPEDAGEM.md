@@ -13,6 +13,7 @@ como `https://reservas.seudominio.com.br`.
 6. [Alternativa: plataformas gerenciadas](#6-alternativa-plataformas-gerenciadas)
 7. [Checklist de segurança antes de abrir ao público](#7-checklist-de-segurança-antes-de-abrir-ao-público)
 8. [Problemas comuns na hospedagem](#8-problemas-comuns-na-hospedagem)
+9. [E-mail (envio do protocolo)](#9-e-mail-envio-do-protocolo)
 
 ---
 
@@ -236,7 +237,7 @@ o roteiro é:
 3. Configure as variáveis de ambiente: `DATABASE_URL`, `AUTH_SECRET`,
    `APP_URL` (com `https://`), `SESSION_HOURS` e, opcionalmente, `SMTP_*`.
 4. Comando de build: `npx prisma migrate deploy && npm run build`.
-   Comando de início: `npm start`.
+   Comando de início: `npm run start:servidor` (usa a porta da variável `PORT` que a plataforma define).
 5. No painel da plataforma, adicione seu **domínio personalizado** e crie no DNS
    o registro indicado por ela (geralmente `CNAME`).
 6. Crie o primeiro administrador rodando, uma vez, do seu computador:
@@ -259,7 +260,8 @@ Observações:
 
 - [ ] `AUTH_SECRET` e `POSTGRES_PASSWORD` gerados aleatoriamente (nunca os valores de exemplo).
 - [ ] `.env.producao` **não** está no GitHub (o `.gitignore` já o exclui).
-- [ ] Nenhum administrador de demonstração (`admin@exemplo.local`) existe em produção.
+- [ ] Nenhum administrador de demonstração (`admin@exemplo.local`) existe em produção (o painel avisa se existir).
+- [ ] E-mail configurado e testado em **Configurações → Enviar e-mail de teste**.
 - [ ] Senhas de administradores fortes e individuais (cada pessoa com seu login).
 - [ ] Firewall com apenas as portas 22, 80 e 443 abertas.
 - [ ] Backup automático configurado e testado (faça uma restauração de teste).
@@ -280,3 +282,64 @@ Observações:
 | Login funciona e logo desloga | `APP_URL` com `https://` mas acessando por `http://`. Acesse sempre pelo domínio com HTTPS. |
 | Build falha por falta de memória | Servidor com 1 GB: crie um swap de 2 GB (`fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile`). |
 | Horários exibidos errados | O sistema sempre exibe no fuso `America/Sao_Paulo`, independentemente do fuso do servidor. Se algo divergir, verifique o relógio do servidor (`timedatectl`). |
+
+---
+
+## 9. E-mail (envio do protocolo)
+
+Quando o solicitante informa um e-mail, o sistema envia automaticamente:
+
+- a **confirmação do pedido** com o **protocolo** e o **código de acesso**, e um botão para consultar a situação;
+- as **atualizações**: aprovação, rejeição, pedido de informações, sugestão de outra sala e cancelamento.
+
+Opcionalmente, a administração também recebe um aviso a cada nova solicitação
+(**Configurações → E-mails**).
+
+Para isso, configure um servidor de envio (SMTP) no `.env.producao` (ou no
+`.env`, no computador local) e reinicie o sistema. Depois, use
+**Configurações → Enviar e-mail de teste** para confirmar.
+
+### Opção A — Gmail (simples, até ~500 e-mails/dia)
+
+1. Use uma conta Google **criada só para o sistema** (ex.: `reservas.suaunidade@gmail.com`).
+2. Ative a **verificação em duas etapas**: <https://myaccount.google.com/security>.
+3. Crie uma **senha de app**: <https://myaccount.google.com/apppasswords> (nome: “Reservas”).
+   O Google mostra 16 letras. Essa é a senha do SMTP (não use a senha normal da conta).
+4. No arquivo de configuração:
+
+```env
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="reservas.suaunidade@gmail.com"
+SMTP_PASSWORD="abcdefghijklmnop"
+SMTP_FROM="Reservas de Salas <reservas.suaunidade@gmail.com>"
+```
+
+### Opção B — serviço de envio transacional (recomendado para uso contínuo)
+
+Serviços como **Brevo** (plano gratuito com cerca de 300 e-mails/dia),
+**Resend**, **Mailgun** ou **Amazon SES** entregam melhor e caem menos no spam,
+principalmente se você usar o **seu domínio** como remetente. Todos fornecem
+dados SMTP: copie `host`, `porta`, `usuário` e `senha` para as variáveis
+acima. No painel do serviço, siga as instruções para **verificar o domínio**
+(registros DNS SPF e DKIM).
+
+### Outlook / Hotmail
+
+Contas pessoais do Outlook.com costumam bloquear o envio por SMTP de
+aplicativos. Se quiser tentar: `SMTP_HOST="smtp-mail.outlook.com"`,
+`SMTP_PORT="587"`. Se o e-mail de teste falhar com erro de autenticação, use a
+opção A ou B.
+
+### Testando sem servidor de e-mail
+
+No computador local, **sem** SMTP configurado, cada e-mail é salvo como
+arquivo na pasta `.emails-enviados/` do projeto. Dê dois cliques no arquivo
+`.eml` para abri-lo no Outlook, Thunderbird ou Correio do Windows e ver
+exatamente o que o solicitante receberia.
+
+### Dicas
+
+- Peça ao solicitante para verificar a caixa de **spam** nas primeiras mensagens.
+- Se o e-mail falhar, o pedido é registrado normalmente e a tela de confirmação
+  avisa para anotar o protocolo. Nada se perde.

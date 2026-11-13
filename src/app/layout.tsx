@@ -9,7 +9,12 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSettings().catch(() => null);
   const name = s?.unitName ?? siteConfig.defaultUnitName;
-  return { title: { default: name, template: `%s · ${name}` }, description: s?.headerSubtitle ?? siteConfig.defaultSubtitle };
+  return {
+    title: { default: name, template: `%s · ${name}` },
+    description: s?.headerSubtitle ?? siteConfig.defaultSubtitle,
+    // Ao adicionar à tela inicial do iPhone, abre como aplicativo.
+    appleWebApp: { capable: true, title: name, statusBarStyle: 'default' },
+  };
 }
 
 export const viewport: Viewport = { themeColor: '#033D60', width: 'device-width', initialScale: 1 };

@@ -5,7 +5,8 @@ import { ProtocolLookup } from '@/components/public/protocol-lookup';
 export const metadata: Metadata = { title: 'Consultar protocolo' };
 export const dynamic = 'force-dynamic';
 
-export default function ProtocolPage() {
+export default async function ProtocolPage({ searchParams }: { searchParams: Promise<{ protocolo?: string }> }) {
+  const { protocolo } = await searchParams;
   return (
     <>
       <SiteHeader />
@@ -14,7 +15,7 @@ export default function ProtocolPage() {
         <p className="mt-1 text-sm text-ink-soft">
           Informe o número do protocolo e o código de acesso recebidos ao enviar o pedido.
         </p>
-        <ProtocolLookup />
+        <ProtocolLookup initialProtocol={(protocolo ?? '').slice(0, 40)} />
       </main>
       <SiteFooter />
     </>

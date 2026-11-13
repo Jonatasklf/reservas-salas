@@ -54,10 +54,17 @@ export function errorResponse(err: unknown): Response {
   );
 }
 
+/** Tamanho máximo aceito no corpo JSON (proteção contra envios gigantes). */
+const MAX_JSON_BYTES = 64 * 1024;
+
 export async function parseJson<S extends ZodTypeAny>(req: Request, schema: S): Promise<output<S>> {
+  const declared = Number(req.headers.get('content-length') ?? 0);
+  if (declared > MAX_JSON_BYTES) throw new AppError(413, 'TOO_LARGE', 'Os dados enviados são grandes demais.');
+  const raw = await req.text();
+  if (raw.length > MAX_JSON_BYTES) throw new AppError(413, 'TOO_LARGE', 'Os dados enviados são grandes demais.');
   let body: unknown;
   try {
-    body = await req.json();
+    body = JSON.parse(raw);
   } catch {
     throw badRequest('Corpo da requisição inválido.');
   }
