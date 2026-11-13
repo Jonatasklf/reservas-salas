@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "description": "Sistema web de reservas de salas de reuniões",
+  "license": "MIT",
+  "author": "Jonatasklf",
   "scripts": {
     "dev": "next dev -p 3000 -H 127.0.0.1",
     "dev:rede": "next dev -p 3000 -H 0.0.0.0",

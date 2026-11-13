@@ -1,5 +1,7 @@
 # Sistema de Reservas de Salas
 
+[![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-033D60.svg)](LICENSE)
+
 Sistema web para organizar as salas de reuniões de uma unidade administrativa:
 calendário público de ocupação, solicitações de reserva sem cadastro, fila de
 aprovação em ordem de chegada, reuniões recorrentes e área administrativa
@@ -303,7 +305,15 @@ git push -u origin main
 
 ---
 
-## Licença e uso
+## Licença
 
-Projeto de uso interno. Defina a licença desejada antes de tornar o
-repositório público.
+Este projeto é distribuído sob a **Licença MIT**. Veja o arquivo [LICENSE](LICENSE).
+
+Em resumo: qualquer pessoa pode usar, copiar, modificar, mesclar, publicar,
+distribuir, sublicenciar e vender cópias do software, desde que o aviso de
+copyright e o texto da licença sejam mantidos. O software é fornecido
+“como está”, sem garantias.
+
+A licença cobre o **código-fonte** deste repositório. Ela não concede direitos
+sobre nomes, marcas ou logotipos de terceiros (por exemplo, o logotipo enviado
+pela tela Configurações).
