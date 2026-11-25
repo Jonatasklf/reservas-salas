@@ -2,7 +2,7 @@
 
 Todas as mudanças importantes do projeto ficam registradas aqui. As versões
 seguem o padrão [SemVer](https://semver.org/lang/pt-BR/): `MAIOR.MENOR.CORREÇÃO`.
-Cada versão fica disponível no GitHub em **Releases** (código e `.zip` da época).
+A versão mais recente fica no ramo `main`; cada versão anterior fica guardada numa *tag* (GitHub → **Tags**).
 
 ## [1.1.0] — 25/11/2026
 
@@ -63,5 +63,5 @@ Primeira versão publicada.
   HTTPS automático (Caddy) e documentação completa.
 - Licença MIT.
 
-[1.1.0]: https://github.com/Jonatasklf/reservas-salas/releases/tag/v1.1.0
-[1.0.0]: https://github.com/Jonatasklf/reservas-salas/releases/tag/v1.0.0
+[1.1.0]: https://github.com/Jonatasklf/reservas-salas/tree/v1.1.0
+[1.0.0]: https://github.com/Jonatasklf/reservas-salas/tree/v1.0.0

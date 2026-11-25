@@ -304,11 +304,12 @@ No GitHub, abra um **Pull Request** para revisão e depois faça o *merge* na
 **Nunca envie** `.env`, `.env.producao`, a pasta `.banco-local/` nem backups
 do banco. O `.gitignore` já os exclui.
 
-### Versões (releases)
+### Versões
 
-Cada versão publicada recebe uma *tag* (`v1.0.0`, `v1.1.0`…) e uma **Release** no
-GitHub, com o `.zip` do código daquela época. As versões antigas continuam
-disponíveis em **Releases**. O que mudou está no [CHANGELOG.md](CHANGELOG.md).
+A versão mais recente é sempre a do ramo `main`. Cada versão também recebe uma
+*tag* (`v1.0.0`, `v1.1.0`…), que guarda o código daquela época; no GitHub, elas
+aparecem em **Tags** (com download em `.zip`). O que mudou está no
+[CHANGELOG.md](CHANGELOG.md).
 
 Para usar uma versão específica:
 
@@ -325,8 +326,6 @@ Para publicar uma versão nova: atualize `"version"` no `package.json` e o
 git tag -a v1.2.0 -m "Versão 1.2.0"
 git push origin main --tags
 ```
-
-Por fim, crie a Release no GitHub a partir da tag (botão **Draft a new release**).
 
 ### Primeira publicação do repositório
 
