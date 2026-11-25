@@ -9,3 +9,7 @@ node_modules
 .claude
 coverage
 *.log
+servico-whatsapp
+**/node_modules
+.emails-enviados
+.whatsapp-enviados

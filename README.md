@@ -15,6 +15,7 @@ completa, sempre **sem conflitos de horário**.
 | **[INSTALACAO.md](INSTALACAO.md)** | Passo a passo para Windows, macOS e Linux |
 | **[HOSPEDAGEM.md](HOSPEDAGEM.md)** | Publicar na internet com domínio e HTTPS |
 | **[ARQUITETURA.md](ARQUITETURA.md)** | Decisões técnicas e como os módulos se conectam |
+| **[CHANGELOG.md](CHANGELOG.md)** | O que mudou em cada versão e como atualizar |
 
 ---
 
@@ -47,8 +48,10 @@ Fluxo: **abrir o site → escolher a data → ver as salas → solicitar → rec
 - **Filtros**: horário, número de participantes, projetor e outros equipamentos.
 - **Formulário de solicitação** em janela modal, com validação imediata. Se
   a capacidade não comportar o grupo, sugere salas alternativas.
-- Ao enviar, o solicitante recebe **protocolo + código de acesso**. O pedido
-  fica *Aguardando aprovação* (enviar não significa aprovar).
+- Ao enviar, o solicitante recebe **protocolo + código de acesso** na tela e
+  pelo **WhatsApp** e/ou **e-mail** (canal escolhido em Configurações, com o
+  outro como reserva). O pedido fica *Aguardando aprovação* (enviar não
+  significa aprovar).
 - **Consulta do protocolo** (`/protocolo`): exige protocolo e código, sem
   expor dados de outras pessoas.
 
@@ -62,7 +65,7 @@ Fluxo: **abrir o site → escolher a data → ver as salas → solicitar → rec
 | Reservas | Reservas diretas, edição, cancelamento, histórico, exportação CSV e impressão/PDF |
 | Solicitações | Fila cronológica; aprovar, rejeitar, pedir informações, sugerir outra sala/horário |
 | Calendário administrativo | Ocupação de todas as salas + bloqueios (feriados, manutenção) |
-| Configurações | Nome da unidade, logotipo, horários, regras, e-mail, administradores, senha |
+| Configurações | Nome da unidade, logotipo, horários, regras, canal (WhatsApp/e-mail), conexão do WhatsApp, administradores, senha |
 
 ### Regras centrais
 
@@ -131,6 +134,7 @@ Detalhes em [ARQUITETURA.md](ARQUITETURA.md).
 │   ├── lib/                   # Banco, autenticação, validação, datas, erros
 │   └── middleware.ts          # Proteção das rotas /admin e /api/admin
 ├── tests/                     # Testes automáticos
+├── servico-whatsapp/          # Serviço de WhatsApp (whatsapp-web.js), opcional
 ├── scripts/                   # Banco local, criação de admin, preparação do .env
 ├── instalar / iniciar / parar (.bat e .sh)
 ├── docker-compose.yml         # PostgreSQL para desenvolvimento
@@ -235,9 +239,12 @@ Siga o caminho que os dados percorrem:
   5. `components/admin/requests-page.tsx`: exiba o campo no detalhe.
 - **Textos dos e-mails:** `src/server/emails.ts` (confirmação com protocolo,
   atualizações e aviso à administração).
-- **Quando cada e-mail é enviado:** `createPublicRequest` e `notifyRequester` em
-  `src/server/services/requests.ts`. O transporte (SMTP) fica em `src/lib/email.ts`.
-  Para configurar o SMTP, veja [HOSPEDAGEM.md, seção 9](HOSPEDAGEM.md#9-e-mail-envio-do-protocolo).
+- **Textos do WhatsApp:** `src/server/whatsapp-mensagens.ts`.
+- **Regra de canal (WhatsApp/e-mail e reserva):** `src/server/notifications.ts`.
+- **Quando cada aviso é enviado:** `createPublicRequest` e `notifyRequester` em
+  `src/server/services/requests.ts`. Transportes: `src/lib/email.ts` (SMTP) e
+  `src/lib/whatsapp.ts` (fala com o serviço `servico-whatsapp/`). Configuração:
+  [HOSPEDAGEM.md, seções 9 e 10](HOSPEDAGEM.md#10-whatsapp-envio-do-protocolo).
 - **Regras de antecedência e horários padrão:** tela **Configurações**. Duração
   mínima, passo dos horários e horizonte de recorrência ficam em `src/config/site.ts`.
 
@@ -273,8 +280,9 @@ Além desses:
 - `security.integration.test.ts` testa **todas** as rotas administrativas sem
   login, tokens forjados, expirados ou sem assinatura, encerramento de
   sessões, CSRF, envios gigantes e privacidade da API pública.
-- `email.integration.test.ts` confere que o protocolo e o código são enviados
-  por e-mail e que o conteúdo digitado é escapado.
+- `notifications.integration.test.ts` confere o envio do protocolo e do código
+  por WhatsApp e/ou e-mail conforme o canal, o uso do outro canal quando um
+  falha, a normalização dos telefones e o escape do conteúdo digitado.
 
 **Ao criar uma rota administrativa nova, o teste de segurança a encontra
 sozinho** e falha se ela responder sem login.
@@ -295,6 +303,30 @@ No GitHub, abra um **Pull Request** para revisão e depois faça o *merge* na
 
 **Nunca envie** `.env`, `.env.producao`, a pasta `.banco-local/` nem backups
 do banco. O `.gitignore` já os exclui.
+
+### Versões (releases)
+
+Cada versão publicada recebe uma *tag* (`v1.0.0`, `v1.1.0`…) e uma **Release** no
+GitHub, com o `.zip` do código daquela época. As versões antigas continuam
+disponíveis em **Releases**. O que mudou está no [CHANGELOG.md](CHANGELOG.md).
+
+Para usar uma versão específica:
+
+```bash
+git checkout v1.0.0
+```
+
+Para voltar à mais recente: `git checkout main`.
+
+Para publicar uma versão nova: atualize `"version"` no `package.json` e o
+`CHANGELOG.md`, faça o commit e depois:
+
+```bash
+git tag -a v1.2.0 -m "Versão 1.2.0"
+git push origin main --tags
+```
+
+Por fim, crie a Release no GitHub a partir da tag (botão **Draft a new release**).
 
 ### Primeira publicação do repositório
 

@@ -57,6 +57,24 @@ if errorlevel 1 (
   exit /b 1
 )
 
+rem Acrescenta ao .env variaveis de versoes novas (sem alterar as existentes).
+call node scripts\preparar-env.mjs >nul
+
+rem ---------------------------------------------------------------
+rem Servico de WhatsApp (se foi instalado): abre em outra janela.
+rem Na primeira vez, o QR Code para conectar aparece nessa janela
+rem e tambem em Configuracoes no sistema.
+rem ---------------------------------------------------------------
+if exist servico-whatsapp\node_modules (
+  netstat -ano | findstr /r /c:":3200 .*LISTENING" >nul
+  if errorlevel 1 (
+    echo [WhatsApp] Iniciando o servico de WhatsApp em outra janela...
+    start "WhatsApp - Reservas de Salas" /min cmd /k "node servico-whatsapp\servidor.mjs"
+  ) else (
+    echo [WhatsApp] Servico de WhatsApp ja esta em execucao.
+  )
+)
+
 rem ---------------------------------------------------------------
 rem Servidor web
 rem  - iniciar.bat            -> modo desenvolvimento (recarrega ao editar o codigo)

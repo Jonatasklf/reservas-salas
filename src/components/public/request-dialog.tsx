@@ -34,8 +34,7 @@ interface Success {
   receivedAt: string;
   warnings: string[];
   hasCompetition: boolean;
-  emailStatus: 'sent' | 'failed' | 'not_configured' | 'not_requested';
-  email: string | null;
+  delivery: { whatsapp: 'sent' | 'failed' | 'not_attempted'; email: 'sent' | 'failed' | 'not_attempted'; phone: string | null; email_address: string | null };
 }
 
 type Alternative = { id: string; name: string; capacity: number; location: string | null };
@@ -154,12 +153,16 @@ export function RequestDialog({
           {success.hasCompetition && (
             <Alert tone="warning">Já existe outro pedido em análise para este mesmo horário. A administração analisa os pedidos por ordem de chegada.</Alert>
           )}
-          {success.emailStatus === 'sent' && (
-            <Alert tone="success">Enviamos o protocolo e o código de acesso para <strong>{success.email}</strong>. Verifique também a caixa de spam.</Alert>
+          {success.delivery.whatsapp === 'sent' && (
+            <Alert tone="success">Enviamos o protocolo e o código de acesso para o seu WhatsApp <strong>{success.delivery.phone}</strong>.</Alert>
           )}
-          {(success.emailStatus === 'failed' || success.emailStatus === 'not_configured') && (
-            <Alert tone="warning">Não foi possível enviar o e-mail de confirmação agora. Anote ou copie o protocolo e o código acima.</Alert>
+          {success.delivery.email === 'sent' && (
+            <Alert tone="success">Enviamos o protocolo e o código de acesso para <strong>{success.delivery.email_address}</strong>. Verifique também a caixa de spam.</Alert>
           )}
+          {success.delivery.whatsapp !== 'sent' && success.delivery.email !== 'sent' &&
+            (success.delivery.whatsapp === 'failed' || success.delivery.email === 'failed') && (
+              <Alert tone="warning">Não foi possível enviar a confirmação agora. Anote ou copie o protocolo e o código acima.</Alert>
+            )}
           {success.warnings.map((w) => <Alert key={w} tone="warning">{w}</Alert>)}
         </div>
       </Dialog>
@@ -258,10 +261,10 @@ export function RequestDialog({
         </fieldset>
 
         <p className="sm:col-span-2 -mb-2 text-sm font-medium">Contato para retorno <span className="font-normal text-ink-soft">(informe pelo menos um)</span></p>
-        <Field label="Telefone" htmlFor="r-contactPhone" error={errors.contactPhone}>
+        <Field label="WhatsApp / telefone" htmlFor="r-contactPhone" error={errors.contactPhone} hint="Recomendado: você receberá o protocolo pelo WhatsApp.">
           <Input id="r-contactPhone" type="tel" autoComplete="tel" placeholder="(11) 91234-5678" value={form.contactPhone} aria-invalid={Boolean(errors.contactPhone)} onChange={(e) => set('contactPhone', e.target.value)} />
         </Field>
-        <Field label="E-mail" htmlFor="r-contactEmail" error={errors.contactEmail} hint="Recomendado: você receberá o protocolo por e-mail.">
+        <Field label="E-mail" htmlFor="r-contactEmail" error={errors.contactEmail} hint="Opcional se você informou o WhatsApp.">
           <Input id="r-contactEmail" type="email" autoComplete="email" placeholder="nome@exemplo.com" value={form.contactEmail} aria-invalid={Boolean(errors.contactEmail)} onChange={(e) => set('contactEmail', e.target.value)} />
         </Field>
 

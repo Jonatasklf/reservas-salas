@@ -1,0 +1,32 @@
+{
+  "name": "reservas-servico-whatsapp",
+  "version": "1.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Serviço de envio de mensagens por WhatsApp (whatsapp-web.js) do sistema de reservas",
+  "type": "module",
+  "scripts": {
+    "start": "node servidor.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "github:wwebjs/whatsapp-web.js#38eb45b2759450cc6fccb6a7a3f2cbc3bdb87db2"
+  },
+  "allowScripts": {
+    "puppeteer@24.43.1": true,
+    "github:wwebjs/whatsapp-web.js": false
+  },
+  "overrides": {
+    "puppeteer": "^24.43.1",
+    "basic-ftp": "^6.2.6",
+    "extract-zip": "^2.0.1",
+    "zod": "^4.6.7",
+    "glob": "^14.0.6",
+    "minimatch": "^11.0.9",
+    "get-uri": "^8.0.2"
+  }
+}

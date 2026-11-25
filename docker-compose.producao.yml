@@ -30,6 +30,20 @@ services:
       banco:
         condition: service_healthy
 
+  # Serviço de WhatsApp (opcional). Só sobe se .env.producao tiver
+  # COMPOSE_PROFILES="whatsapp". Sem "ports": acessível apenas pelo app.
+  whatsapp:
+    build: ./servico-whatsapp
+    profiles: ["whatsapp"]
+    restart: unless-stopped
+    environment:
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_HOST: 0.0.0.0
+      WHATSAPP_PORTA: "3200"
+      WHATSAPP_SESSAO_DIR: /app/.sessao
+    volumes:
+      - whatsapp_sessao:/app/.sessao
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -49,3 +63,4 @@ volumes:
   dados_banco:
   caddy_dados:
   caddy_config:
+  whatsapp_sessao: # sessão do WhatsApp (equivale a estar logado)

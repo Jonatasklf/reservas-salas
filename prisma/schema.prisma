@@ -383,5 +383,14 @@ model Settings {
   showPublicTitles Boolean @default(true)
   emailNotifications Boolean @default(false)
   notificationEmail  String?
+  /// Por onde o solicitante recebe protocolo e atualizações.
+  /// Se o canal escolhido falhar ou não houver o contato, usa o outro.
+  requesterChannel   NotificationChannel @default(WHATSAPP)
   updatedAt        DateTime @updatedAt
+}
+
+enum NotificationChannel {
+  WHATSAPP // Somente WhatsApp (e-mail como reserva se falhar)
+  EMAIL    // Somente e-mail (WhatsApp como reserva se falhar)
+  BOTH     // WhatsApp e e-mail
 }

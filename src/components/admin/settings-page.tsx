@@ -4,7 +4,8 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { ImageUp, KeyRound, Trash2, UserPlus } from 'lucide-react';
-import { Alert, Badge, Button, Card, Checkbox, Field, Input, PageHeader, Spinner, Textarea, useToast } from '@/components/ui';
+import { Alert, Badge, Button, Card, Checkbox, Field, Input, PageHeader, Select, Spinner, Textarea, useToast } from '@/components/ui';
+import { WhatsAppSettings } from './whatsapp-settings';
 import { api, ApiError, useFetch } from '@/lib/client';
 import { formatDateTime } from '@/lib/time';
 
@@ -19,6 +20,7 @@ interface SettingsDto {
   showPublicTitles: boolean;
   emailNotifications: boolean;
   notificationEmail: string | null;
+  requesterChannel: 'WHATSAPP' | 'EMAIL' | 'BOTH';
   hasLogo: boolean;
   logoUpdatedAt: string | null;
 }
@@ -32,6 +34,7 @@ export function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <GeneralSettings initial={data.data.settings} emailConfigured={data.data.emailConfigured} onSaved={data.reload} />
         <div className="space-y-6">
+          <WhatsAppSettings />
           <LogoSettings settings={data.data.settings} onChanged={data.reload} />
           <AdminsSettings />
           <PasswordSettings />
@@ -67,6 +70,7 @@ function GeneralSettings({ initial, emailConfigured, onSaved }: { initial: Setti
           defaultOpenTime: form.defaultOpenTime, defaultCloseTime: form.defaultCloseTime,
           minAdvanceMinutes: Number(form.minAdvanceMinutes), maxAdvanceDays: Number(form.maxAdvanceDays),
           showPublicTitles: form.showPublicTitles, emailNotifications: form.emailNotifications, notificationEmail: form.notificationEmail || null,
+          requesterChannel: form.requesterChannel,
         },
       });
       toast('success', 'Configurações salvas.');
@@ -95,9 +99,22 @@ function GeneralSettings({ initial, emailConfigured, onSaved }: { initial: Setti
         </div>
         <Checkbox label="Exibir títulos das reuniões na página pública (quando autorizado em cada reserva)" checked={form.showPublicTitles} onChange={(e) => set('showPublicTitles', e.target.checked)} />
         <div className="space-y-2 rounded-lg border border-mist p-3">
+          <Field
+            label="Como o solicitante recebe o protocolo e as atualizações"
+            htmlFor="cfg-canal"
+            hint="Se o canal escolhido falhar ou a pessoa não informar esse contato, o sistema usa o outro."
+          >
+            <Select id="cfg-canal" value={form.requesterChannel} onChange={(e) => set('requesterChannel', e.target.value as SettingsDto['requesterChannel'])}>
+              <option value="WHATSAPP">WhatsApp (e-mail como reserva)</option>
+              <option value="EMAIL">E-mail (WhatsApp como reserva)</option>
+              <option value="BOTH">WhatsApp e e-mail</option>
+            </Select>
+          </Field>
+        </div>
+        <div className="space-y-2 rounded-lg border border-mist p-3">
           <p className="text-sm font-medium">E-mails</p>
           <p className="text-xs text-ink-soft">
-            Quem informa e-mail na solicitação recebe automaticamente o <strong>protocolo e o código de acesso</strong>, e depois as atualizações (aprovação, rejeição etc.).
+            Usado conforme o canal escolhido acima: protocolo, código de acesso e atualizações (aprovação, rejeição etc.).
           </p>
           {emailConfigured ? (
             <p className="text-xs text-success">Servidor de e-mail (SMTP) configurado.</p>

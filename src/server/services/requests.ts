@@ -20,8 +20,10 @@ import crypto from 'node:crypto';
 import type { Prisma, RequestStatus } from '@prisma/client';
 import { prisma, transaction, lockRooms, type Db } from '@/lib/db';
 import { AppError, conflict, notFound } from '@/lib/errors';
-import { sendEmail, type EmailResult } from '@/lib/email';
+import { sendEmail } from '@/lib/email';
 import { adminNewRequestEmail, requestReceivedEmail, requestUpdateEmail } from '../emails';
+import { deliverToRequester, type DeliveryReport } from '../notifications';
+import { requestReceivedWhatsApp, requestUpdateWhatsApp } from '../whatsapp-mensagens';
 import { utcToDateString, zonedToUtc } from '@/lib/time';
 import { siteConfig } from '@/config/site';
 import type { DecisionInput, PublicRequestInput } from '@/lib/validation';
@@ -63,9 +65,8 @@ export interface CreateRequestResult {
   status: RequestStatus;
   warnings: string[];
   hasCompetition: boolean;
-  /** sent = e-mail com o protocolo enviado; not_requested = sem e-mail informado. */
-  emailStatus: 'sent' | 'failed' | 'not_configured' | 'not_requested';
-  email: string | null;
+  /** Por onde o protocolo foi enviado (WhatsApp e/ou e-mail). */
+  delivery: DeliveryReport;
 }
 
 export async function createPublicRequest(input: PublicRequestInput, now: Date = new Date()): Promise<CreateRequestResult> {
@@ -138,14 +139,18 @@ export async function createPublicRequest(input: PublicRequestInput, now: Date =
     where: { id: { not: created.id }, roomId: room.id, status: { in: OPEN_STATUSES }, startAt: { lt: endAt }, endAt: { gt: startAt } },
   });
 
-  // E-mails: confirmação ao solicitante (com protocolo e código) e aviso à administração.
+  // Confirmação ao solicitante (protocolo + código) pelo canal configurado
+  // (WhatsApp, e-mail ou ambos, com o outro como reserva) e aviso à administração.
   const settings = await getSettings();
   const info = { protocol: created.protocol, requesterName: created.requesterName, roomName: room.name, startAt, endAt, participants: created.participants };
-  let emailStatus: CreateRequestResult['emailStatus'] = 'not_requested';
-  if (created.contactEmail) {
-    const result = await withTimeout(sendEmail(requestReceivedEmail(settings.unitName, created.contactEmail, info, accessCode)), 12_000);
-    emailStatus = result === 'sent' || result === 'saved' ? 'sent' : result === 'skipped' ? 'not_configured' : 'failed';
-  }
+  const delivery = await deliverToRequester(
+    settings,
+    { phone: created.contactPhone, email: created.contactEmail },
+    {
+      whatsapp: () => requestReceivedWhatsApp(settings.unitName, info, accessCode),
+      email: (to) => requestReceivedEmail(settings.unitName, to, info, accessCode),
+    },
+  );
   if (settings.emailNotifications && settings.notificationEmail) {
     void sendEmail(adminNewRequestEmail(settings.unitName, settings.notificationEmail, info));
   }
@@ -157,14 +162,8 @@ export async function createPublicRequest(input: PublicRequestInput, now: Date =
     status: created.status,
     warnings,
     hasCompetition: competing > 0,
-    emailStatus,
-    email: created.contactEmail,
+    delivery,
   };
-}
-
-/** Não deixa um servidor de e-mail lento travar o envio do pedido. */
-async function withTimeout(p: Promise<EmailResult>, ms: number): Promise<EmailResult> {
-  return Promise.race([p, new Promise<EmailResult>((resolve) => setTimeout(() => resolve('failed'), ms))]);
 }
 
 /** Outras salas ativas que comportam o pedido no mesmo horário. */
@@ -514,27 +513,29 @@ async function cancelRequest(id: string, reason: string, adminId: string) {
 }
 
 /**
- * Avisa o solicitante (se ele informou e-mail) sobre a mudança de situação.
- * Executa em segundo plano: a decisão do administrador não espera o e-mail.
+ * Avisa o solicitante sobre a mudança de situação, pelo canal configurado
+ * (WhatsApp e/ou e-mail). Executa em segundo plano: a decisão do
+ * administrador não espera a mensagem ser entregue.
  */
-function notifyRequester(req: { id: string; contactEmail: string | null }, headline: string) {
-  if (!req.contactEmail) return;
+function notifyRequester(req: { id: string; contactEmail: string | null; contactPhone: string | null }, headline: string) {
+  if (!req.contactEmail && !req.contactPhone) return;
   void (async () => {
     const [s, full] = await Promise.all([
       getSettings(),
       prisma.reservationRequest.findUnique({ where: { id: req.id }, include: { room: { select: { name: true } } } }),
     ]);
-    if (!full?.contactEmail) return;
-    await sendEmail(
-      requestUpdateEmail(
-        s.unitName,
-        full.contactEmail,
-        { protocol: full.protocol, requesterName: full.requesterName, roomName: full.room.name, startAt: full.startAt, endAt: full.endAt, participants: full.participants },
-        headline,
-        { publicMessage: full.publicMessage, suggestion: full.suggestion },
-      ),
+    if (!full) return;
+    const info = { protocol: full.protocol, requesterName: full.requesterName, roomName: full.room.name, startAt: full.startAt, endAt: full.endAt, participants: full.participants };
+    const extra = { publicMessage: full.publicMessage, suggestion: full.suggestion };
+    await deliverToRequester(
+      s,
+      { phone: full.contactPhone, email: full.contactEmail },
+      {
+        whatsapp: () => requestUpdateWhatsApp(s.unitName, info, headline, extra),
+        email: (to) => requestUpdateEmail(s.unitName, to, info, headline, extra),
+      },
     );
-  })().catch((err) => console.error('[e-mail] Falha ao notificar solicitante:', err));
+  })().catch((err) => console.error('[avisos] Falha ao notificar solicitante:', err));
 }
 
 /** Indicador para o menu: quantidade de solicitações em aberto. */

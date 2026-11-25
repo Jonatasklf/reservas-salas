@@ -21,7 +21,17 @@ if "!ENCONTRADO!"=="1" (
   echo [--] O servidor web nao estava em execucao.
 )
 
-rem 2) Banco de dados
+rem 2) Servico de WhatsApp (porta 3200) - a sessao continua salva
+set WPP=0
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r /c:":3200 .*LISTENING"') do (
+  if not "%%p"=="0" (
+    taskkill /PID %%p /T /F >nul 2>&1
+    set WPP=1
+  )
+)
+if "!WPP!"=="1" echo [OK] Servico de WhatsApp encerrado ^(continua conectado para a proxima vez^).
+
+rem 3) Banco de dados
 set MODO=local
 if exist .modo-banco set /p MODO=<.modo-banco
 if /i "!MODO!"=="docker" (

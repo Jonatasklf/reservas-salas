@@ -100,6 +100,27 @@ if /i "!DEMO!"=="S" (
   call npm run db:seed
 )
 
+rem ---------------------------------------------------------------
+rem 6) Servico de WhatsApp (opcional)
+rem ---------------------------------------------------------------
+echo.
+echo [Opcional] WhatsApp: envia o protocolo ao solicitante pelo WhatsApp.
+echo            Baixa um navegador Chrome proprio (cerca de 150 MB).
+if exist servico-whatsapp\node_modules (
+  set WPP=S
+  echo            Ja instalado: atualizando...
+) else (
+  set /p WPP="Deseja instalar o servico de WhatsApp? (S/N): "
+)
+if /i "!WPP!"=="S" (
+  call npm run whatsapp:instalar
+  if errorlevel 1 (
+    echo [AVISO] O servico de WhatsApp nao foi instalado. O sistema funciona normalmente, usando e-mail.
+  ) else (
+    echo [OK] Servico de WhatsApp instalado. O iniciar.bat abre ele em outra janela.
+  )
+)
+
 echo.
 echo ============================================================
 echo   Instalacao concluida.

@@ -1,6 +1,6 @@
 {
   "name": "reservas-salas",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Sistema web de reservas de salas de reuniões",
   "license": "MIT",
@@ -23,6 +23,8 @@
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "admin:criar": "tsx scripts/criar-admin.ts",
+    "whatsapp": "node servico-whatsapp/servidor.mjs",
+    "whatsapp:instalar": "npm --prefix servico-whatsapp ci --no-audit --no-fund",
     "postinstall": "prisma generate"
   },
   "prisma": {

@@ -239,22 +239,69 @@ Códigos usados:
 | `CONFLICT` | Estado não permite a ação |
 | `TOO_MANY_REQUESTS` | Limite de tentativas atingido |
 
-## 12. E-mail
+## 12. Avisos ao solicitante (WhatsApp e e-mail)
 
-- `src/lib/email.ts`: transporte. Com `SMTP_HOST` envia de verdade. Sem SMTP
-  em desenvolvimento, salva `.eml` em `.emails-enviados/`. Em produção sem
-  SMTP, só registra no log. `sendEmail()` nunca lança erro.
-- `src/server/emails.ts`: **todos os modelos** (texto + HTML com a identidade
-  visual). Para mudar uma mensagem, edite só esse arquivo.
-- Envios:
-  - solicitante: confirmação com protocolo + código, enviada logo após o
-    pedido (com limite de 12 s para não travar a tela; o resultado aparece na
-    confirmação);
-  - solicitante: atualizações (aprovação, rejeição, informações, sugestão,
-    cancelamento), em segundo plano;
-  - administração: aviso de nova solicitação, se ativado em Configurações.
-- O link do e-mail leva o **protocolo** na URL, mas **nunca** o código de acesso.
-- **Configurações → Enviar e-mail de teste** mostra o erro real do SMTP.
+```
+requests.ts ──► notifications.ts (escolhe o canal e a reserva)
+                   ├── lib/whatsapp.ts ──HTTP+token──► servico-whatsapp/ ──► WhatsApp Web
+                   └── lib/email.ts ──SMTP──► servidor de e-mail
+```
+
+- **Canal** (`Settings.requesterChannel`): `WHATSAPP` (padrão), `EMAIL` ou
+  `BOTH`. `deliverToRequester()` tenta o canal principal e, se não houver o
+  contato ou o envio falhar, o outro. O resultado (`DeliveryReport`) aparece
+  na tela de confirmação. Nunca lança erro.
+- **Mensagens:** `src/server/emails.ts` (texto + HTML) e
+  `src/server/whatsapp-mensagens.ts` (texto com a formatação do WhatsApp).
+  O conteúdo digitado é escapado (HTML) ou limpo de marcações (WhatsApp).
+- **Envios:**
+  - confirmação com protocolo + código, logo após o pedido (o pedido já está
+    gravado; o envio tem limite de tempo para não travar a tela);
+  - atualizações (aprovação, rejeição, informações, sugestão, cancelamento),
+    em segundo plano;
+  - aviso de nova solicitação à administração (e-mail), se ativado.
+- Os links levam o **protocolo** na URL, **nunca** o código de acesso.
+- **Testes de configuração:** botões “Enviar e-mail de teste” e “Enviar teste”
+  (WhatsApp) em Configurações mostram o erro real.
+
+### E-mail
+
+`src/lib/email.ts`: com `SMTP_HOST` envia de verdade. Sem SMTP em
+desenvolvimento, salva `.eml` em `.emails-enviados/`. Em produção sem SMTP,
+só registra no log.
+
+### WhatsApp
+
+- **Serviço separado** (`servico-whatsapp/servidor.mjs`, com dependências
+  próprias): o whatsapp-web.js mantém um Chrome com o WhatsApp Web, o que exige
+  um processo que roda o tempo todo, independente do Next.js (que pode reiniciar
+  ou rodar em várias instâncias). Isso também evita baixar o Chrome em quem não
+  usa WhatsApp.
+- **Comunicação:** HTTP interno (`WHATSAPP_URL`) com `Authorization: Bearer
+  WHATSAPP_TOKEN` (comparação em tempo constante). Endpoints: `GET /status`
+  (estado + QR em data URL), `POST /enviar`, `POST /sair`. Escuta em `127.0.0.1`
+  no computador; no Docker fica sem porta publicada.
+- **Envio:** fila de uma mensagem por vez, com intervalo aleatório de 2 a 3,5 s
+  (`WHATSAPP_INTERVALO_MS`). `getNumberId()` resolve o número real no WhatsApp
+  (inclusive a questão do 9º dígito); número sem WhatsApp devolve
+  `SEM_WHATSAPP` e o sistema usa o e-mail.
+- **Sessão:** `LocalAuth` em `servico-whatsapp/.sessao` (ou
+  `WHATSAPP_SESSAO_DIR`). Cada tentativa de conexão cria um cliente/Chrome novo
+  e fecha o anterior. Em queda, reconecta sozinho.
+- **Telefones:** `normalizePhoneBR()` aceita os formatos usuais e devolve
+  `55DDNNNNNNNNN`.
+- **Sem serviço configurado** (desenvolvimento): mensagens salvas em
+  `.whatsapp-enviados/`.
+- **Riscos conhecidos:** biblioteca não oficial (pode quebrar com mudanças do
+  WhatsApp Web; o número pode ser restringido). Mitigações: fallback para
+  e-mail, número dedicado, fila com intervalo. Nesta versão a biblioteca está
+  fixada no commit `38eb45b` do GitHub (correção ainda não publicada no npm).
+- **Dependências do Puppeteer:** o `extract-zip` (usado só para descompactar o
+  Chrome oficial na instalação) tem alerta sem versão corrigida. Na imagem
+  Docker o download é desativado e usa-se o Chromium do sistema.
+- **Alternativa oficial:** para trocar pela WhatsApp Cloud API (Meta),
+  basta reimplementar `sendWhatsApp()`/`getWhatsAppStatus()` em
+  `src/lib/whatsapp.ts`; o resto do sistema não muda.
 
 ## 13. Banco local sem Docker
 

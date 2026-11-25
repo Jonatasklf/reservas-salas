@@ -225,6 +225,18 @@ no celular durante os testes:
 **Dica:** no celular, use **“Adicionar à tela inicial”** (iPhone/Safari: botão
 Compartilhar; Android/Chrome: menu ⋮). O sistema abre em tela cheia, como um aplicativo.
 
+### WhatsApp (opcional)
+
+Para enviar o protocolo ao solicitante pelo WhatsApp:
+
+1. Responda **S** quando o instalador perguntar sobre o WhatsApp.
+2. O `iniciar` abre o serviço de WhatsApp junto (no Windows, numa janela separada).
+3. Em **Configurações**, escaneie o QR Code com o celular do número que vai
+   enviar as mensagens (**use um número dedicado ao sistema**).
+
+Passo a passo completo, cuidados e solução de problemas:
+[HOSPEDAGEM.md, seção 10](HOSPEDAGEM.md#10-whatsapp-envio-do-protocolo).
+
 ### Atualizar sua cópia depois de mudanças no GitHub
 
 Windows:

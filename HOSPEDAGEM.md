@@ -16,6 +16,7 @@ como `https://reservas.seudominio.com.br`.
 8. [Problemas comuns na hospedagem](#8-problemas-comuns-na-hospedagem)
    - [8.1. Diagnóstico do Caddy (HTTPS e domínio)](#81-diagnóstico-do-caddy-https-e-domínio)
 9. [E-mail (envio do protocolo)](#9-e-mail-envio-do-protocolo)
+10. [WhatsApp (envio do protocolo)](#10-whatsapp-envio-do-protocolo)
 
 ---
 
@@ -302,6 +303,7 @@ Observações:
 - [ ] `.env.producao` **não** está no GitHub (o `.gitignore` já o exclui).
 - [ ] Nenhum administrador de demonstração (`admin@exemplo.local`) existe em produção (o painel avisa se existir).
 - [ ] E-mail configurado e testado em **Configurações → Enviar e-mail de teste**.
+- [ ] Se usar WhatsApp: número **dedicado** ao sistema, conectado e testado em **Configurações → WhatsApp**.
 - [ ] Senhas de administradores fortes e individuais (cada pessoa com seu login).
 - [ ] Firewall com apenas as portas 22, 80 e 443 abertas.
 - [ ] Backup automático configurado e testado (faça uma restauração de teste).
@@ -437,3 +439,158 @@ exatamente o que o solicitante receberia.
 - Peça ao solicitante para verificar a caixa de **spam** nas primeiras mensagens.
 - Se o e-mail falhar, o pedido é registrado normalmente e a tela de confirmação
   avisa para anotar o protocolo. Nada se perde.
+
+---
+
+## 10. WhatsApp (envio do protocolo)
+
+A partir da versão 1.1.0, o solicitante pode receber o **protocolo, o código de
+acesso e as atualizações** (aprovação, rejeição etc.) pelo **WhatsApp**.
+
+Em **Configurações → Como o solicitante recebe o protocolo**, escolha:
+
+| Opção | Comportamento |
+|---|---|
+| **WhatsApp** (padrão) | Envia pelo WhatsApp. Se a pessoa não informou telefone, o número não tem WhatsApp ou o envio falhar, usa o **e-mail**. |
+| **E-mail** | Envia por e-mail. Se não houver e-mail ou falhar, usa o **WhatsApp**. |
+| **WhatsApp e e-mail** | Envia pelos dois. |
+
+Em todos os casos, a tela de confirmação mostra por onde a mensagem foi
+enviada; se nada funcionar, ela pede para a pessoa anotar o protocolo.
+
+### Como funciona
+
+O envio usa o **whatsapp-web.js**: um programa separado (pasta
+`servico-whatsapp/`) mantém o **WhatsApp Web** aberto num Chrome invisível,
+conectado ao número da unidade, e envia as mensagens que o site pede.
+
+```
+Site (reservas) ──token──► Serviço de WhatsApp ──► WhatsApp Web ──► celular do solicitante
+```
+
+> **⚠️ Importante — leia antes de usar**
+>
+> - O whatsapp-web.js **não é oficial**. Automatizar o WhatsApp Web vai contra os
+>   termos de uso do WhatsApp, e o **número pode ser bloqueado**, principalmente
+>   se enviar muitas mensagens ou para quem não tem o número salvo.
+> - **Use um número dedicado ao sistema** (um chip só para isso), nunca o número
+>   principal da unidade ou um número pessoal.
+> - O sistema já reduz o risco: só envia para quem fez a solicitação, uma
+>   mensagem por vez, com intervalo entre elas.
+> - Quando o WhatsApp muda o WhatsApp Web, a biblioteca pode parar de funcionar
+>   até ser atualizada (veja “Manutenção” abaixo). Nesse meio-tempo, o sistema
+>   **usa o e-mail automaticamente**.
+> - Para uso em grande escala e sem risco de bloqueio, a alternativa é a API
+>   oficial (WhatsApp Cloud API, da Meta), que exige cadastro e é paga por mensagem.
+
+### 10.1. No seu computador (Windows, macOS, Linux)
+
+1. Rode o instalador (`instalar.bat` / `./instalar.sh`) e responda **S** à pergunta
+   do WhatsApp. Ele baixa um Chrome próprio (cerca de 150 MB) e gera o token
+   de segurança no `.env` (`WHATSAPP_URL` e `WHATSAPP_TOKEN`).
+2. Rode `iniciar.bat` / `./iniciar.sh`. O serviço de WhatsApp abre junto
+   (no Windows, numa janela separada chamada “WhatsApp - Reservas de Salas”).
+3. Entre no sistema como administrador e abra **Configurações**. O cartão
+   **WhatsApp** mostra um **QR Code**.
+4. No celular do número que vai **enviar** as mensagens: WhatsApp →
+   **Aparelhos conectados → Conectar um aparelho** → aponte para o QR Code.
+5. O cartão passa a mostrar **Conectado** com o número. Use **Enviar teste** com o
+   seu próprio número para conferir.
+6. Escolha o canal em **Configurações → Como o solicitante recebe o protocolo** e
+   clique em **Salvar configurações**.
+
+A conexão fica salva (pasta `servico-whatsapp/.sessao`): nas próximas vezes não
+é preciso escanear de novo. Para trocar de número, use **Desconectar** no cartão.
+
+Comandos manuais equivalentes:
+
+```bash
+npm run whatsapp:instalar
+```
+```bash
+npm run whatsapp
+```
+
+> **Windows — pasta curta:** o Chrome grava a sessão em pastas muito
+> profundas. Se o projeto estiver num caminho longo, o QR Code não aparece
+> (fica em “Iniciando…” e o log mostra `Waiting failed`). Use uma pasta como
+> `C:\Projetos\reservas-salas` ou defina no `.env` uma pasta curta para a
+> sessão: `WHATSAPP_SESSAO_DIR="C:\whatsapp-reservas"`.
+
+### 10.2. Na VPS (Docker)
+
+O serviço já está no `docker-compose.producao.yml` (contêiner `whatsapp`, que
+usa o Chromium do sistema). Ele só sobe se estiver ativado:
+
+1. No `.env.producao`, confira/acrescente:
+
+   ```env
+   COMPOSE_PROFILES="whatsapp"
+   WHATSAPP_URL="http://whatsapp:3200"
+   WHATSAPP_TOKEN="cole-aqui-um-token-aleatorio"
+   ```
+
+   Gere o token com: `openssl rand -base64 32`.
+
+2. Atualize e suba:
+
+   ```bash
+   cd ~/reservas-salas
+   ```
+   ```bash
+   git pull
+   ```
+   ```bash
+   docker compose -f docker-compose.producao.yml --env-file .env.producao up -d --build
+   ```
+
+3. Abra `https://SEU-DOMINIO/admin` → **Configurações** e escaneie o QR Code
+   (passos 3 a 6 da seção 10.1).
+
+Memória: o Chromium usa de 300 a 500 MB. Com WhatsApp ativo, use uma VPS com
+**pelo menos 2 GB de RAM**. A sessão fica no volume `whatsapp_sessao` (não se
+perde ao atualizar). Para ver o que o serviço está fazendo:
+
+```bash
+docker compose -f docker-compose.producao.yml --env-file .env.producao logs whatsapp --tail 40
+```
+
+### 10.3. Segurança
+
+- O serviço **só aceita pedidos com o token** (`WHATSAPP_TOKEN`). No computador
+  ele escuta apenas em `127.0.0.1`; no Docker, não tem porta aberta para a
+  internet (só o site fala com ele).
+- A pasta `.sessao` (ou o volume `whatsapp_sessao`) **equivale a estar logado** no
+  WhatsApp do número: não a copie para outros lugares nem a envie ao GitHub
+  (o `.gitignore` já a exclui).
+- Se o celular for perdido ou alguém tiver acesso indevido: no celular, em
+  **Aparelhos conectados**, desconecte o aparelho “Chrome”, ou use **Desconectar**
+  no sistema.
+
+### 10.4. Manutenção (quando o WhatsApp muda)
+
+O WhatsApp atualiza o WhatsApp Web com frequência e, de vez em quando, a
+biblioteca precisa de uma correção. Sinais: o QR Code não aparece mais ou o
+cartão fica em “Iniciando…”; os pedidos continuam chegando e o sistema usa o
+e-mail. O que fazer:
+
+1. Veja se há versão nova em <https://github.com/wwebjs/whatsapp-web.js/releases>.
+2. Atualize a dependência em `servico-whatsapp/package.json` e rode
+   `npm run whatsapp:instalar` (ou o `instalar` de novo). No Docker, `up -d --build`.
+
+> Nesta versão, a biblioteca está fixada num commit do GitHub (`38eb45b`, de
+> 24/11/2026) que corrige a última mudança do WhatsApp Web e ainda não saiu no
+> npm. Quando a versão **1.34.9** (ou superior) for publicada, troque a linha
+> `"whatsapp-web.js"` em `servico-whatsapp/package.json` pela versão do npm.
+
+### 10.5. Problemas comuns
+
+| Sintoma | Solução |
+|---|---|
+| Cartão mostra “Serviço de WhatsApp fora do ar” | O serviço não está rodando. Use `iniciar.bat` (ou `npm run whatsapp`). Na VPS, confira `COMPOSE_PROFILES="whatsapp"` e os logs. |
+| “Serviço de WhatsApp não configurado” | Faltam `WHATSAPP_URL` e `WHATSAPP_TOKEN` no `.env`. Rode o instalador de novo (ele acrescenta). |
+| Fica em “Iniciando…” e o log mostra `Waiting failed` | No Windows, caminho longo (veja 10.1). Em geral, mudança do WhatsApp Web (veja 10.4). |
+| `WHATSAPP_TOKEN ausente, curto ou ainda com o valor de exemplo` | Gere um token (instalador ou `openssl rand -base64 32`). |
+| Teste diz “Este número não tem WhatsApp” | Confira DDD e número. Telefones fixos geralmente não têm WhatsApp. |
+| Mensagens pararam e o celular mostra aviso de conta | O número pode ter sido restringido pelo WhatsApp. Troque para outro número dedicado e reduza o volume. Enquanto isso, mude o canal para **E-mail**. |
+

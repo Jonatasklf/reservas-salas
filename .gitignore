@@ -33,3 +33,7 @@ coverage/
 
 # e-mails salvos em desenvolvimento (sem SMTP)
 .emails-enviados/
+
+# mensagens de WhatsApp salvas em desenvolvimento e log do serviço
+.whatsapp-enviados/
+.whatsapp.log

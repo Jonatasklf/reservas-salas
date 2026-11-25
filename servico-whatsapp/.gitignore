@@ -1,0 +1,5 @@
+node_modules/
+# sessão do WhatsApp (equivale a estar logado: NUNCA envie ao GitHub)
+.sessao/
+.wwebjs_auth/
+.wwebjs_cache/

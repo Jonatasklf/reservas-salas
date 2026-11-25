@@ -26,6 +26,20 @@ fi
 echo "[2/3] Aplicando atualizações do banco de dados (migrações)..."
 npx prisma migrate deploy >/dev/null
 
+# Acrescenta ao .env variáveis de versões novas (sem alterar as existentes).
+node scripts/preparar-env.mjs >/dev/null
+
+# Serviço de WhatsApp (se instalado): roda em segundo plano, log em .whatsapp.log.
+# Na primeira vez, o QR Code aparece nesse log e em Configurações no sistema.
+if [ -d servico-whatsapp/node_modules ]; then
+  if (command -v lsof >/dev/null && lsof -ti tcp:3200 -sTCP:LISTEN >/dev/null 2>&1); then
+    echo "[WhatsApp] Serviço já está em execução."
+  else
+    echo "[WhatsApp] Iniciando o serviço (log: .whatsapp.log; QR Code também em Configurações)..."
+    nohup node servico-whatsapp/servidor.mjs > .whatsapp.log 2>&1 &
+  fi
+fi
+
 echo "[3/3] Iniciando o sistema em http://localhost:3000"
 echo "      Para encerrar: Ctrl+C e depois ./parar.sh"
 # Abre o navegador depois de alguns segundos (se houver interface gráfica).

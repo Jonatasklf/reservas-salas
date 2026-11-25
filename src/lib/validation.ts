@@ -276,6 +276,7 @@ export const settingsSchema = z
     maxAdvanceDays: intFrom(1, 3650),
     showPublicTitles: z.boolean(),
     emailNotifications: z.boolean(),
+    requesterChannel: z.enum(['WHATSAPP', 'EMAIL', 'BOTH']),
     notificationEmail: optionalText(160).refine((v) => !v || z.string().email().safeParse(v).success, 'E-mail inválido.'),
   })
   .refine((v) => timeToMinutes(v.defaultCloseTime) > timeToMinutes(v.defaultOpenTime), {
