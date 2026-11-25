@@ -165,8 +165,10 @@ describe('conteúdo e números', () => {
     await setChannel('BOTH');
     const room = await makeRoom();
     await createPublicRequest(
-      requestInput(room.id, { requesterName: 'Fulano *Negrito* <script>x</script>', contactPhone: '11912345678', contactEmail: 'p@exemplo.local' }),
+      // A saudação usa o primeiro nome: o conteúdo malicioso está nele.
+      requestInput(room.id, { requesterName: '*Negrito*<script>x</script> Silva', contactPhone: '11912345678', contactEmail: 'p@exemplo.local' }),
     );
+    expect(whats[0].text).toContain('A paz de Deus, Irmão(a)');
     expect(whats[0].text).not.toContain('*Negrito*');
     expect(emails[0].html).not.toContain('<script>');
     expect(emails[0].html).toContain(escapeHtml('<script>'));

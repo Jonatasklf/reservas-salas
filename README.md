@@ -239,6 +239,7 @@ Siga o caminho que os dados percorrem:
   5. `components/admin/requests-page.tsx`: exiba o campo no detalhe.
 - **Textos dos e-mails:** `src/server/emails.ts` (confirmação com protocolo,
   atualizações e aviso à administração).
+- **Saudação e despedida** (“A paz de Deus…”, “Deus que abençoe.”): `src/config/site.ts`, bloco `mensagens` (vale para WhatsApp e e-mail).
 - **Textos do WhatsApp:** `src/server/whatsapp-mensagens.ts`.
 - **Regra de canal (WhatsApp/e-mail e reserva):** `src/server/notifications.ts`.
 - **Quando cada aviso é enviado:** `createPublicRequest` e `notifyRequester` em

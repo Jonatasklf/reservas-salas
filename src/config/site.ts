@@ -65,6 +65,29 @@ export const siteConfig = {
     purposeMaxLength: 500,
     nameMaxLength: 120,
   },
+
+  /**
+   * Saudação e despedida das mensagens enviadas ao solicitante (WhatsApp e
+   * e-mail, na confirmação e nas atualizações). {nome} é trocado pelo
+   * primeiro nome da pessoa.
+   */
+  mensagens: {
+    saudacao: 'A paz de Deus, Irmão(a) {nome}!',
+    avisoAutomaticoWhatsApp: 'Não responder essa conversa, trata-se de mensagem automática.',
+    avisoAutomaticoEmail: 'Não responder este e-mail, trata-se de mensagem automática.',
+    despedida: 'Deus que abençoe.',
+  },
 } as const;
+
+/** Primeiro nome, para a saudação ("Larissa Souza" → "Larissa"). */
+export function primeiroNome(nomeCompleto: string): string {
+  const nome = nomeCompleto.trim();
+  return nome.split(/\s+/)[0] || nome;
+}
+
+/** Saudação pronta para o nome informado. */
+export function saudacao(nomeCompleto: string): string {
+  return siteConfig.mensagens.saudacao.replace('{nome}', primeiroNome(nomeCompleto));
+}
 
 export type RequestStatusKey = keyof typeof siteConfig.requestStatusLabels;

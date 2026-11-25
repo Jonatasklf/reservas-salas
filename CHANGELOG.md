@@ -4,6 +4,17 @@ Todas as mudanças importantes do projeto ficam registradas aqui. As versões
 seguem o padrão [SemVer](https://semver.org/lang/pt-BR/): `MAIOR.MENOR.CORREÇÃO`.
 A versão mais recente fica no ramo `main`; cada versão anterior fica guardada numa *tag* (GitHub → **Tags**).
 
+## [1.1.1] — 25/11/2026
+
+### Alterado
+
+- Mensagens de WhatsApp e e-mail (confirmação e atualizações) agora começam com
+  **“A paz de Deus, Irmão(a) {nome}!”** e terminam com o aviso de mensagem
+  automática e **“Deus que abençoe.”**
+- Saudação, aviso e despedida ficam em um só lugar: `src/config/site.ts`
+  (bloco `mensagens`).
+- `.wwebjs_cache/` e `.wwebjs_auth/` adicionados ao `.gitignore`.
+
 ## [1.1.0] — 25/11/2026
 
 ### Novo
@@ -63,5 +74,6 @@ Primeira versão publicada.
   HTTPS automático (Caddy) e documentação completa.
 - Licença MIT.
 
+[1.1.1]: https://github.com/Jonatasklf/reservas-salas/tree/v1.1.1
 [1.1.0]: https://github.com/Jonatasklf/reservas-salas/tree/v1.1.0
 [1.0.0]: https://github.com/Jonatasklf/reservas-salas/tree/v1.0.0

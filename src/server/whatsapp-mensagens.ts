@@ -5,6 +5,7 @@
  * arquivo. Formatação do WhatsApp: *negrito*, _itálico_.
  */
 import { formatDateShort, formatRange, utcToDateString } from '@/lib/time';
+import { saudacao, siteConfig } from '@/config/site';
 
 const appUrl = () => (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 
@@ -19,14 +20,16 @@ export interface RequestInfo {
 
 /** Remove marcações que poderiam bagunçar a formatação do WhatsApp. */
 const limpo = (texto: string) => texto.replace(/[*_~`]/g, '').trim();
-const primeiroNome = (nome: string) => limpo(nome).split(/\s+/)[0] || limpo(nome);
 const quando = (r: RequestInfo) => `${formatDateShort(utcToDateString(r.startAt))}, ${formatRange(r.startAt, r.endAt)}`;
 const link = (protocol: string) => `${appUrl()}/protocolo?protocolo=${encodeURIComponent(protocol)}`;
+
+/** Fecho comum: aviso de mensagem automática + despedida (src/config/site.ts). */
+const fecho = () => ['', siteConfig.mensagens.avisoAutomaticoWhatsApp, '', siteConfig.mensagens.despedida];
 
 /** Confirmação logo após o pedido (com protocolo e código de acesso). */
 export function requestReceivedWhatsApp(unitName: string, r: RequestInfo, accessCode: string): string {
   return [
-    `Olá, ${primeiroNome(r.requesterName)}! Recebemos sua solicitação de reserva.`,
+    `${saudacao(limpo(r.requesterName))} Recebemos sua solicitação de reserva.`,
     '',
     `*Protocolo:* ${r.protocol}`,
     `*Código de acesso:* ${accessCode}`,
@@ -37,8 +40,7 @@ export function requestReceivedWhatsApp(unitName: string, r: RequestInfo, access
     'Situação: *aguardando aprovação*. O envio não significa que a reserva foi aprovada.',
     '',
     `Consulte a situação em: ${link(r.protocol)}`,
-    '',
-    `_${limpo(unitName)} — mensagem automática._`,
+    ...fecho(),
   ].join('\n');
 }
 
@@ -50,7 +52,9 @@ export function requestUpdateWhatsApp(
   extra: { publicMessage?: string | null; suggestion?: string | null },
 ): string {
   return [
-    `Olá, ${primeiroNome(r.requesterName)}. *${headline}*`,
+    saudacao(limpo(r.requesterName)),
+    '',
+    `*${headline}*`,
     '',
     `*Protocolo:* ${r.protocol}`,
     `*Sala:* ${limpo(r.roomName)}`,
@@ -59,8 +63,7 @@ export function requestUpdateWhatsApp(
     ...(extra.suggestion ? ['', `*Sugestão:* ${limpo(extra.suggestion)}`] : []),
     '',
     `Consulte em: ${link(r.protocol)}`,
-    '',
-    `_${limpo(unitName)} — mensagem automática._`,
+    ...fecho(),
   ].join('\n');
 }
 

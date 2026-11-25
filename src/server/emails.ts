@@ -7,6 +7,13 @@
  */
 import type { EmailMessage } from '@/lib/email';
 import { formatDateShort, formatRange, utcToDateString } from '@/lib/time';
+import { saudacao, siteConfig } from '@/config/site';
+
+/** Despedida no fim do e-mail (texto em src/config/site.ts). */
+const despedidaHtml = () => `<p style="margin:20px 0 0">${escapeHtml(siteConfig.mensagens.despedida)}</p>`;
+
+/** Fecho da versão em texto simples: aviso de mensagem automática + despedida. */
+const fechoTexto = () => `${siteConfig.mensagens.avisoAutomaticoEmail}\n\n${siteConfig.mensagens.despedida}`;
 
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -28,7 +35,7 @@ function layout(unitName: string, title: string, bodyHtml: string): string {
 ${bodyHtml}
 </td></tr>
 <tr><td style="padding:14px 24px;background:#eef1f4;font-size:12px;color:#55595f">
-Mensagem automática. Não responda a este e-mail.
+${escapeHtml(siteConfig.mensagens.avisoAutomaticoEmail)}
 </td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -63,7 +70,7 @@ export function requestReceivedEmail(unitName: string, to: string, r: RequestInf
   const html = layout(
     unitName,
     'Recebemos sua solicitação de reserva',
-    `<p style="margin:0 0 8px">Olá, ${escapeHtml(r.requesterName)}.</p>
+    `<p style="margin:0 0 8px">${escapeHtml(saudacao(r.requesterName))}</p>
 <p style="margin:0">Seu pedido foi registrado e está <strong>aguardando aprovação</strong> da administração.
 <strong>O envio não significa que a reserva foi aprovada.</strong></p>
 ${detailsTable([
@@ -74,13 +81,14 @@ ${detailsTable([
   ['Participantes', String(r.participants)],
 ])}
 <p style="margin:0">Guarde o protocolo e o código de acesso: eles são necessários para consultar a situação do pedido.</p>
-${button(link, 'Consultar situação')}`,
+${button(link, 'Consultar situação')}
+${despedidaHtml()}`,
   );
   const text =
-    `Olá, ${r.requesterName}.\n\nRecebemos sua solicitação de reserva. Ela está AGUARDANDO APROVAÇÃO ` +
+    `${saudacao(r.requesterName)} Recebemos sua solicitação de reserva. Ela está AGUARDANDO APROVAÇÃO ` +
     `(o envio não significa que a reserva foi aprovada).\n\n` +
     `Protocolo: ${r.protocol}\nCódigo de acesso: ${accessCode}\nSala: ${r.roomName}\nData e horário: ${when(r)}\n` +
-    `Participantes: ${r.participants}\n\nConsulte a situação em: ${link}\n\n${unitName}`;
+    `Participantes: ${r.participants}\n\nConsulte a situação em: ${link}\n\n${fechoTexto()}`;
   return { to, subject, text, html };
 }
 
@@ -101,20 +109,22 @@ export function requestUpdateEmail(
   const html = layout(
     unitName,
     headline,
-    `<p style="margin:0">Olá, ${escapeHtml(r.requesterName)}. Há uma atualização na sua solicitação.</p>
+    `<p style="margin:0 0 8px">${escapeHtml(saudacao(r.requesterName))}</p>
+<p style="margin:0">Há uma atualização na sua solicitação.</p>
 ${detailsTable([
   ['Protocolo', escapeHtml(r.protocol)],
   ['Sala', escapeHtml(r.roomName)],
   ['Data e horário', escapeHtml(when(r))],
 ])}
 ${notes}
-${button(link, 'Consultar situação')}`,
+${button(link, 'Consultar situação')}
+${despedidaHtml()}`,
   );
   const text =
-    `Olá, ${r.requesterName}.\n\n${headline}\n\nProtocolo: ${r.protocol}\nSala: ${r.roomName}\nData e horário: ${when(r)}\n` +
+    `${saudacao(r.requesterName)}\n\n${headline}\n\nProtocolo: ${r.protocol}\nSala: ${r.roomName}\nData e horário: ${when(r)}\n` +
     (extra.publicMessage ? `\nMensagem da administração: ${extra.publicMessage}\n` : '') +
     (extra.suggestion ? `\nSugestão: ${extra.suggestion}\n` : '') +
-    `\nConsulte em: ${link}\n\n${unitName}`;
+    `\nConsulte em: ${link}\n\n${fechoTexto()}`;
   return { to, subject, text, html };
 }
 

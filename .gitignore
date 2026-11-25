@@ -37,3 +37,7 @@ coverage/
 # mensagens de WhatsApp salvas em desenvolvimento e log do serviço
 .whatsapp-enviados/
 .whatsapp.log
+
+# cache e sessão do WhatsApp Web (criados ao rodar o serviço)
+.wwebjs_cache/
+.wwebjs_auth/
