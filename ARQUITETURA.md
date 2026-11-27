@@ -303,7 +303,26 @@ só registra no log.
   basta reimplementar `sendWhatsApp()`/`getWhatsAppStatus()` em
   `src/lib/whatsapp.ts`; o resto do sistema não muda.
 
-## 13. Banco local sem Docker
+## 13. Registro de atividades e relatórios
+
+- **Fonte única:** o `AuditLog`. Todo serviço já grava ali cada ação
+  (`action`, resumo, autor, entidade). Os envios de WhatsApp/e-mail são
+  gravados por `logDelivery()` (`src/server/notifications.ts`) como
+  `NOTIFICATION_WHATSAPP`/`NOTIFICATION_EMAIL`, com `details.status`
+  (`sent`/`failed`); canal não configurado não gera registro.
+- **Registro de atividades** (`src/server/services/activity.ts`): as ações são
+  agrupadas em categorias (`ACTIVITY_CATEGORIES`, cada uma um filtro Prisma).
+  Para uma ação nova aparecer na categoria certa, use o prefixo correspondente
+  (ex.: `ROOM_`, `RESERVATION_`). Índice `AuditLog(action, createdAt)`.
+- **Relatórios** (`src/server/services/reports.ts`): calculados na hora, sem
+  tabelas extras. Horas disponíveis = horário de funcionamento de cada sala ×
+  dias do período em que a sala funciona; horas ocupadas = reservas
+  confirmadas + ocorrências recorrentes ativas, recortadas ao período. Período
+  máximo de 400 dias.
+- **Exportação:** `src/lib/csv.ts` (BOM UTF-8, `;`, proteção contra fórmulas).
+- **Gráficos:** `src/components/admin/charts.tsx`, em HTML/CSS, sem biblioteca.
+
+## 14. Banco local sem Docker
 
 `scripts/banco-local.mjs` usa os binários oficiais do PostgreSQL distribuídos
 pelo pacote npm `embedded-postgres` e os controla com `initdb`/`pg_ctl` (o
@@ -311,7 +330,7 @@ servidor roda em segundo plano, com log em `.banco-local/postgres.log`). Os
 bancos `reservas` e `reservas_teste` são criados pelo Prisma ao migrar. Na
 imagem Docker de produção esses binários são removidos.
 
-## 14. Pontos de extensão sugeridos
+## 15. Pontos de extensão sugeridos
 
 - Calendário iCal (`.ics`) por sala, gerado a partir das ocorrências (o campo `rrule` já existe).
 - Notificações por WhatsApp/SMS: novo transporte ao lado de `src/lib/email.ts`.

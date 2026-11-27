@@ -294,3 +294,19 @@ export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, msgRequired),
   newPassword: z.string().min(8, 'A senha deve ter pelo menos 8 caracteres.').max(200),
 });
+
+// -----------------------------------------------------------------------------
+// Registro de atividades e relatórios (parâmetros da URL)
+// -----------------------------------------------------------------------------
+export const activityQuerySchema = z.object({
+  de: dateStr.optional(),
+  ate: dateStr.optional(),
+  categoria: z.string().max(30).optional(),
+  admin: z.string().max(40).optional(),
+  busca: z.string().trim().max(100).optional(),
+  pagina: z.coerce.number().int().min(1).max(10_000).optional(),
+});
+
+export const reportQuerySchema = z
+  .object({ de: dateStr, ate: dateStr, sala: z.string().max(40).optional() })
+  .transform((q) => ({ from: q.de, to: q.ate, roomId: q.sala || undefined }));

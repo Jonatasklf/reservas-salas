@@ -4,6 +4,7 @@ import { badRequest } from '@/lib/errors';
 import { formatDateShort, utcToTimeString } from '@/lib/time';
 import { rangeQuerySchema } from '@/lib/validation';
 import { getEvents } from '@/server/services/calendar';
+import { csvCell } from '@/lib/csv';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +13,6 @@ const KIND: Record<string, string> = {
   REQUEST: 'Solicitação pendente', CANCELLED_OCCURRENCE: 'Ocorrência cancelada/suspensa',
 };
 
-function csvCell(v: unknown): string {
-  let s = String(v ?? '');
-  if (/^[=+\-@]/.test(s)) s = "'" + s; // evita fórmulas maliciosas no Excel
-  return '"' + s.replace(/"/g, '""') + '"';
-}
 
 /** Exporta a agenda do período em CSV (abre no Excel). Para PDF, use a tela "Imprimir agenda". */
 export const GET = adminRoute(async (req) => {

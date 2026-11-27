@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  CalendarClock, CalendarDays, ClipboardList, DoorOpen, ExternalLink, Inbox, LayoutDashboard, LogOut, Menu, Repeat, Settings, X,
+  BarChart3, History, CalendarClock, CalendarDays, ClipboardList, DoorOpen, ExternalLink, Inbox, LayoutDashboard, LogOut, Menu, Repeat, Settings, X,
 } from 'lucide-react';
 import { api } from '@/lib/client';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,8 @@ const NAV = [
   { href: '/admin/reservas', label: 'Reservas', icon: ClipboardList },
   { href: '/admin/solicitacoes', label: 'Solicitações pendentes', icon: Inbox, badge: true },
   { href: '/admin/calendario', label: 'Calendário administrativo', icon: CalendarDays },
+  { href: '/admin/relatorios', label: 'Relatórios', icon: BarChart3 },
+  { href: '/admin/atividades', label: 'Registro de atividades', icon: History },
   { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
 ];
 

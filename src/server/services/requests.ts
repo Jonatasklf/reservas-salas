@@ -22,7 +22,7 @@ import { prisma, transaction, lockRooms, type Db } from '@/lib/db';
 import { AppError, conflict, notFound } from '@/lib/errors';
 import { sendEmail } from '@/lib/email';
 import { adminNewRequestEmail, requestReceivedEmail, requestUpdateEmail } from '../emails';
-import { deliverToRequester, type DeliveryReport } from '../notifications';
+import { deliverToRequester, logDelivery, type DeliveryReport } from '../notifications';
 import { requestReceivedWhatsApp, requestUpdateWhatsApp } from '../whatsapp-mensagens';
 import { utcToDateString, zonedToUtc } from '@/lib/time';
 import { siteConfig } from '@/config/site';
@@ -151,6 +151,7 @@ export async function createPublicRequest(input: PublicRequestInput, now: Date =
       email: (to) => requestReceivedEmail(settings.unitName, to, info, accessCode),
     },
   );
+  await logDelivery(created.id, 'confirmacao', delivery);
   if (settings.emailNotifications && settings.notificationEmail) {
     void sendEmail(adminNewRequestEmail(settings.unitName, settings.notificationEmail, info));
   }
@@ -527,7 +528,7 @@ function notifyRequester(req: { id: string; contactEmail: string | null; contact
     if (!full) return;
     const info = { protocol: full.protocol, requesterName: full.requesterName, roomName: full.room.name, startAt: full.startAt, endAt: full.endAt, participants: full.participants };
     const extra = { publicMessage: full.publicMessage, suggestion: full.suggestion };
-    await deliverToRequester(
+    const delivery = await deliverToRequester(
       s,
       { phone: full.contactPhone, email: full.contactEmail },
       {
@@ -535,6 +536,7 @@ function notifyRequester(req: { id: string; contactEmail: string | null; contact
         email: (to) => requestUpdateEmail(s.unitName, to, info, headline, extra),
       },
     );
+    await logDelivery(full.id, 'atualizacao', delivery);
   })().catch((err) => console.error('[avisos] Falha ao notificar solicitante:', err));
 }
 

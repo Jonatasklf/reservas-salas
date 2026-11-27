@@ -4,6 +4,31 @@ Todas as mudanças importantes do projeto ficam registradas aqui. As versões
 seguem o padrão [SemVer](https://semver.org/lang/pt-BR/): `MAIOR.MENOR.CORREÇÃO`.
 A versão mais recente fica no ramo `main`; cada versão anterior fica guardada numa *tag* (GitHub → **Tags**).
 
+## [1.2.0] — 27/11/2026
+
+### Novo
+
+- **Relatórios** (menu *Relatórios*): escolha o período (este mês, mês
+  anterior, últimos 30 dias, este ano ou personalizado) e, se quiser, uma sala.
+  Mostra solicitações por situação, taxa de aprovação, tempo médio de
+  resposta, horas ocupadas e taxa de ocupação por sala, uso por dia da semana
+  e por horário, mensagens enviadas/com falha por canal e acessos ao painel.
+  Cada gráfico pode ser visto como tabela. Exporta **CSV** (abre no Excel com
+  acentos) e imprime/salva em **PDF**.
+- **Registro de atividades** (menu *Registro de atividades*): tudo o que
+  acontece no sistema — solicitações, decisões, reservas, recorrências, salas,
+  bloqueios, configurações, acessos e mensagens enviadas — com filtros por
+  período, categoria, quem fez e texto, paginação e exportação CSV.
+- O envio do protocolo e das atualizações (WhatsApp e e-mail, com sucesso ou
+  falha) passa a ficar registrado no histórico da solicitação.
+
+### Alterado
+
+- Novo índice no histórico (migração `indice_atividades`), aplicado
+  automaticamente pelo `iniciar`.
+- Segurança: os testes automáticos nunca enviam mensagens de verdade, mesmo
+  com SMTP ou WhatsApp configurados no `.env`.
+
 ## [1.1.1] — 25/11/2026
 
 ### Alterado
@@ -74,6 +99,7 @@ Primeira versão publicada.
   HTTPS automático (Caddy) e documentação completa.
 - Licença MIT.
 
+[1.2.0]: https://github.com/Jonatasklf/reservas-salas/tree/v1.2.0
 [1.1.1]: https://github.com/Jonatasklf/reservas-salas/tree/v1.1.1
 [1.1.0]: https://github.com/Jonatasklf/reservas-salas/tree/v1.1.0
 [1.0.0]: https://github.com/Jonatasklf/reservas-salas/tree/v1.0.0

@@ -80,6 +80,14 @@ describe('protocolo por WhatsApp (canal padrão)', () => {
     expect(emails).toHaveLength(1);
     expect(emails[0].text).toContain(res.accessCode);
     expect(res.delivery).toMatchObject({ whatsapp: 'failed', email: 'sent', email_address: 'p@exemplo.local' });
+    // Os dois resultados ficam no histórico (Registro de atividades e Relatórios).
+    const req = await prisma.reservationRequest.findUniqueOrThrow({ where: { protocol: res.protocol } });
+    const logs = await prisma.auditLog.findMany({ where: { entityId: req.id, action: { startsWith: 'NOTIFICATION_' } }, orderBy: { action: 'desc' } });
+    expect(logs.map((l) => [l.action, (l.details as { status: string }).status])).toEqual([
+      ['NOTIFICATION_WHATSAPP', 'failed'],
+      ['NOTIFICATION_EMAIL', 'sent'],
+    ]);
+    expect(logs[1].summary).toContain('p@exemplo.local');
   });
 
   it('se o número não tiver WhatsApp, usa o e-mail', async () => {

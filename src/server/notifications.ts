@@ -61,16 +61,55 @@ export async function deliverToRequester(
   for (const channel of order) {
     if (channel === 'whatsapp' && phone) {
       const r = await withTimeout(sendWhatsApp(phone, build.whatsapp()), timeout, 'failed' as const);
-      report.whatsapp = r === 'sent' || r === 'saved' ? 'sent' : 'failed';
+      // 'skipped' = canal não configurado: não conta como tentativa nem como falha.
+      report.whatsapp = r === 'sent' || r === 'saved' ? 'sent' : r === 'skipped' ? 'not_attempted' : 'failed';
       if (report.whatsapp === 'sent') report.phone = formatPhoneBR(phone);
     }
     if (channel === 'email' && contact.email) {
       const r = await withTimeout(sendEmail(build.email(contact.email)), timeout, 'failed' as const);
-      report.email = r === 'sent' || r === 'saved' ? 'sent' : 'failed';
+      report.email = r === 'sent' || r === 'saved' ? 'sent' : r === 'skipped' ? 'not_attempted' : 'failed';
       if (report.email === 'sent') report.email_address = contact.email;
     }
     // Sem "ambos": parar no primeiro canal que funcionou.
     if (!both && (report.whatsapp === 'sent' || report.email === 'sent')) break;
   }
   return report;
+}
+
+/**
+ * Registra no histórico (AuditLog) o resultado de cada canal tentado. Aparece
+ * no histórico da solicitação, no Registro de atividades e nos Relatórios.
+ */
+export async function logDelivery(
+  requestId: string,
+  kind: 'confirmacao' | 'atualizacao',
+  report: DeliveryReport,
+): Promise<void> {
+  const { prisma } = await import('@/lib/db');
+  const { audit } = await import('./services/audit');
+  const what = kind === 'confirmacao' ? 'Protocolo' : 'Atualização';
+  const entries: { action: string; summary: string; status: DeliveryStatus }[] = [];
+  if (report.whatsapp !== 'not_attempted') {
+    entries.push({
+      action: 'NOTIFICATION_WHATSAPP',
+      status: report.whatsapp,
+      summary: report.whatsapp === 'sent' ? `${what} enviado(a) por WhatsApp para ${report.phone}.` : `Falha ao enviar ${what.toLowerCase()} por WhatsApp.`,
+    });
+  }
+  if (report.email !== 'not_attempted') {
+    entries.push({
+      action: 'NOTIFICATION_EMAIL',
+      status: report.email,
+      summary: report.email === 'sent' ? `${what} enviado(a) por e-mail para ${report.email_address}.` : `Falha ao enviar ${what.toLowerCase()} por e-mail.`,
+    });
+  }
+  for (const e of entries) {
+    await audit(prisma, {
+      action: e.action,
+      entityType: 'ReservationRequest',
+      entityId: requestId,
+      summary: e.summary,
+      details: { status: e.status, kind },
+    }).catch((err) => console.error('[avisos] Falha ao registrar envio:', err));
+  }
 }

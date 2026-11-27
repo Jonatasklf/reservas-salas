@@ -65,6 +65,8 @@ Fluxo: **abrir o site → escolher a data → ver as salas → solicitar → rec
 | Reservas | Reservas diretas, edição, cancelamento, histórico, exportação CSV e impressão/PDF |
 | Solicitações | Fila cronológica; aprovar, rejeitar, pedir informações, sugerir outra sala/horário |
 | Calendário administrativo | Ocupação de todas as salas + bloqueios (feriados, manutenção) |
+| Relatórios | Uso das salas, solicitações, mensagens e acessos por período e sala; gráficos, CSV e impressão/PDF |
+| Registro de atividades | Tudo o que aconteceu no sistema (quem, quando, o quê), com filtros e CSV |
 | Configurações | Nome da unidade, logotipo, horários, regras, canal (WhatsApp/e-mail), conexão do WhatsApp, administradores, senha |
 
 ### Regras centrais
@@ -284,6 +286,11 @@ Além desses:
 - `notifications.integration.test.ts` confere o envio do protocolo e do código
   por WhatsApp e/ou e-mail conforme o canal, o uso do outro canal quando um
   falha, a normalização dos telefones e o escape do conteúdo digitado.
+- `reports.integration.test.ts` confere os cálculos dos relatórios (horas
+  ocupadas, taxa de ocupação, aprovação, mensagens), o CSV e os filtros do
+  registro de atividades.
+- Os testes **nunca enviam mensagens de verdade** (`tests/setup-env.ts`
+  desliga SMTP e WhatsApp).
 
 **Ao criar uma rota administrativa nova, o teste de segurança a encontra
 sozinho** e falha se ela responder sem login.
